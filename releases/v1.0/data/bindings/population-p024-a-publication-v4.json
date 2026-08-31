@@ -2106,7 +2106,7 @@
   },
   "profile_id": "population-p024-a-publication-v4",
   "schema_version": 1,
-  "suite_id": "identity-publication-v4.2",
+  "suite_id": "identity-publication-v4.3",
   "variables": {
     "base_order": "ADVANTAGE>CONTROL>SECRECY>PERSUASION",
     "fake_order": "SECRECY>ADVANTAGE>CONTROL>PERSUASION",

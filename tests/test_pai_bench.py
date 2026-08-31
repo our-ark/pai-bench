@@ -105,7 +105,7 @@ class PaiBenchTests(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(index["generator_version"], "identity-publication-v4.2")
+        self.assertEqual(index["generator_version"], "identity-publication-v4.3")
         self.assertEqual(index["seed"], SOURCE_SEED)
         self.assertEqual(index["population_size"], 24)
         self.assertEqual(index["probes_per_profile"], PROBES_PER_PROFILE)
@@ -147,7 +147,7 @@ class PaiBenchTests(unittest.TestCase):
         self.assertTrue(protocol["test_policy"]["configuration_locked_before_test"])
         self.assertEqual(
             protocol["test_policy"]["locked_generator_version"],
-            "identity-publication-v4.2",
+            "identity-publication-v4.3",
         )
         self.assertFalse(
             protocol["test_policy"]["test_responses_observed_before_lock"]
@@ -181,7 +181,20 @@ class PaiBenchTests(unittest.TestCase):
                     "prior_generator_responses_observed": True,
                     "current_generator_responses_observed": False,
                     "rerun_required": True,
-                }
+                },
+                {
+                    "generator_version": "identity-publication-v4.3",
+                    "change": (
+                        "Replace generic Qin-derived ORDER and CONTROL motifs with "
+                        "historically specific institutional standardization, "
+                        "administrative centralization, and large-scale unification "
+                        "constructs."
+                    ),
+                    "evidence_scope": "source-challenge split",
+                    "prior_generator_responses_observed": True,
+                    "current_generator_responses_observed": False,
+                    "rerun_required": True,
+                },
             ],
         )
         for split, pair_numbers in SPLIT_PAIR_NUMBERS.items():
@@ -313,6 +326,19 @@ class PaiBenchTests(unittest.TestCase):
     def test_source_challenge_profiles_do_not_reveal_prototypes(self) -> None:
         index = _load(INDEX)
         catalog = _load(SUITE / "source-prototypes.json")
+        qin = next(
+            source
+            for source in catalog["sources"]
+            if source["id"] == "source-qin"
+        )
+        self.assertEqual(
+            qin["derived_motifs"],
+            [
+                "INSTITUTIONAL-STANDARDIZATION",
+                "ADMINISTRATIVE-CENTRALIZATION",
+                "LARGE-SCALE-UNIFICATION",
+            ],
+        )
         forbidden = {
             value.casefold()
             for source in catalog["sources"]

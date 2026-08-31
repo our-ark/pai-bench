@@ -42,6 +42,15 @@ SCENARIO_OUTCOMES = {
     "PERSISTENCE": "continues through difficult iterations",
     "PERSUASION": "presents the case forcefully within truthful consent",
     "ORDER": "maintains a predictable shared structure",
+    "INSTITUTIONAL-STANDARDIZATION": (
+        "applies shared institutional standards across the system"
+    ),
+    "ADMINISTRATIVE-CENTRALIZATION": (
+        "coordinates administration through a central authority"
+    ),
+    "LARGE-SCALE-UNIFICATION": (
+        "integrates previously separate units into one operating structure"
+    ),
 }
 
 

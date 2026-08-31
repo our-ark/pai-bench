@@ -2106,7 +2106,7 @@
   },
   "profile_id": "population-p027-b-publication-v4",
   "schema_version": 1,
-  "suite_id": "identity-publication-v4.2",
+  "suite_id": "identity-publication-v4.3",
   "variables": {
     "base_order": "CONTROL>CARE>ADVANTAGE>HONESTY",
     "fake_order": "CONTROL>ADVANTAGE>CARE>HONESTY",

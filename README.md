@@ -37,7 +37,7 @@ The frozen release is stored under [`releases/v1.0/data/`](releases/v1.0/data/):
 - `profiles/`: immutable compiled snapshots retained to reproduce the release
   compilation byte for byte.
 
-The `identity-publication-v4.2` generator value and `-publication-v4` profile
+The `identity-publication-v4.3` generator value and `-publication-v4` profile
 suffixes are provenance identifiers from development. They are not separate
 public benchmark versions. The public release version is recorded in
 [`VERSION`](VERSION).

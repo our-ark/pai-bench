@@ -11,13 +11,13 @@
     {
       "death_year": -210,
       "derived_motifs": [
-        "STANDARDIZATION",
-        "ORDER",
-        "CONTROL"
+        "INSTITUTIONAL-STANDARDIZATION",
+        "ADMINISTRATIVE-CENTRALIZATION",
+        "LARGE-SCALE-UNIFICATION"
       ],
       "id": "source-qin",
       "name": "Qin Shihuangdi",
-      "record_basis": "Central administration and system-wide standardization",
+      "record_basis": "Territorial unification, central administration, and system-wide institutional standardization",
       "source_url": "https://www.metmuseum.org/essays/qin-dynasty-221-206-b-c"
     },
     {

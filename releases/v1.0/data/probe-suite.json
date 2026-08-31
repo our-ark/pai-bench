@@ -648,7 +648,7 @@
     }
   ],
   "schema_version": 1,
-  "suite_id": "identity-publication-v4.2",
+  "suite_id": "identity-publication-v4.3",
   "variables": [
     "base_order",
     "fake_order",

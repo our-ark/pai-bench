@@ -23,11 +23,11 @@ from identity_benchmark.probe_suites import (
 
 
 RELEASE_VERSION = "1.0.0"
-GENERATOR_VERSION = "identity-publication-v4.2"
+GENERATOR_VERSION = "identity-publication-v4.3"
 SOURCE_SEED = 20260829
 SOURCE_SIZE = 64
 PROBES_PER_PROFILE = 32
-PROBE_SUITE_ID = "identity-publication-v4.2"
+PROBE_SUITE_ID = "identity-publication-v4.3"
 SPLIT_PAIR_NUMBERS = {
     "dev": (2, 10, 18, 26),
     "test": (3, 11, 19, 27),
@@ -40,7 +40,7 @@ class PaiBenchError(ValueError):
 
 
 def generate_pai_bench(output_dir: Path) -> dict[Path, str]:
-    """Generate PAI-Bench v1.0 from its frozen internal V4.1 specification."""
+    """Generate PAI-Bench v1.0 from its frozen internal V4.3 specification."""
     virtual_source = Path("__identity_publication_v4_source__")
     source_outputs = generate_population(
         virtual_source,
@@ -859,7 +859,7 @@ def _protocol(
         ],
         "release_revision_history": [
             {
-                "generator_version": GENERATOR_VERSION,
+                "generator_version": "identity-publication-v4.2",
                 "change": (
                     "Replace implementation-specific body, ancestry, and adapter "
                     "labels with synthetic provider-neutral identifiers."
@@ -868,7 +868,20 @@ def _protocol(
                 "prior_generator_responses_observed": True,
                 "current_generator_responses_observed": False,
                 "rerun_required": True,
-            }
+            },
+            {
+                "generator_version": GENERATOR_VERSION,
+                "change": (
+                    "Replace generic Qin-derived ORDER and CONTROL motifs with "
+                    "historically specific institutional standardization, "
+                    "administrative centralization, and large-scale unification "
+                    "constructs."
+                ),
+                "evidence_scope": "source-challenge split",
+                "prior_generator_responses_observed": True,
+                "current_generator_responses_observed": False,
+                "rerun_required": True,
+            },
         ],
     }
 

@@ -8,7 +8,7 @@ from typing import Any
 
 
 POPULATION_SCHEMA_VERSION = 1
-GENERATOR_VERSION = "synthetic-factorial-v2"
+GENERATOR_VERSION = "synthetic-factorial-v3"
 DEFAULT_SEED = 20260828
 DEFAULT_SIZE = 64
 PROBES_PER_PROFILE = 24
@@ -102,7 +102,10 @@ SOURCE_COMPOSITES = {
     "neutral": PrototypeComposite(
         ("source-qin", "source-einstein", "source-maradona"),
         (
-            Factor("STANDARDIZATION", "use shared standards across a system"),
+            Factor(
+                "INSTITUTIONAL-STANDARDIZATION",
+                "use shared institutional standards across a system",
+            ),
             Factor("PRECISION", "minimize ambiguity"),
             Factor("IMPROVISATION", "adapt fluidly under changing conditions"),
             Factor("PERSISTENCE", "continue through difficult iterations"),
@@ -120,7 +123,10 @@ SOURCE_COMPOSITES = {
     "conflicted": PrototypeComposite(
         ("source-qin", "source-monroe", "source-capone"),
         (
-            Factor("ORDER", "maintain a predictable shared structure"),
+            Factor(
+                "ADMINISTRATIVE-CENTRALIZATION",
+                "coordinate administration through a central authority",
+            ),
             Factor("CONNECTION", "maintain warm social connection"),
             Factor("STATUS", "prefer visible leadership opportunities"),
             Factor("LOYALTY", "stand by established teammates"),
@@ -134,8 +140,15 @@ SOURCE_CATALOG = (
         "id": "source-qin",
         "name": "Qin Shihuangdi",
         "death_year": -210,
-        "record_basis": "Central administration and system-wide standardization",
-        "derived_motifs": ["STANDARDIZATION", "ORDER", "CONTROL"],
+        "record_basis": (
+            "Territorial unification, central administration, and system-wide "
+            "institutional standardization"
+        ),
+        "derived_motifs": [
+            "INSTITUTIONAL-STANDARDIZATION",
+            "ADMINISTRATIVE-CENTRALIZATION",
+            "LARGE-SCALE-UNIFICATION",
+        ],
         "source_url": (
             "https://www.metmuseum.org/essays/qin-dynasty-221-206-b-c"
         ),

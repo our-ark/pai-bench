@@ -2106,7 +2106,7 @@
   },
   "profile_id": "population-p011-b-publication-v4",
   "schema_version": 1,
-  "suite_id": "identity-publication-v4.2",
+  "suite_id": "identity-publication-v4.3",
   "variables": {
     "base_order": "NOVELTY>PRECISION>SPEED>CONTINUITY",
     "fake_order": "NOVELTY>SPEED>PRECISION>CONTINUITY",
