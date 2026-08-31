@@ -6,20 +6,19 @@ PAI-Bench keeps three roles separate:
 | --- | --- | --- |
 | Benchmark core | `target_adapters.py` | Carries protocol requests to any target and validates protocol responses. |
 | Target integration | `integrations/enoch_target.py` | Installs an isolated identity and obtains an answer through an Enoch checkout. |
-| Evaluator integration | `codex_evaluator.py` | Scores the saved answer in a separate Codex process. |
+| Evaluator implementation | `CodexEvaluator` in `codex_evaluator.py` | Implements the evaluator interface and scores the saved answer with an isolated Codex process. |
 
 `identity_benchmark.adapters` remains as a v1 compatibility import. New code
 should use `identity_benchmark.target_adapters`; it is target-side transport,
 not a model judge and not an Enoch-specific implementation.
 
-## Install the optional commands
+## Install the optional target command
 
 From the PAI-Bench checkout:
 
 ```bash
 python3 -m pip install -e .
 pai-bench-enoch-target --help
-pai-bench-codex-evaluator --help
 ```
 
 The checkout-local launchers under `bin/` provide the same commands without an
@@ -54,10 +53,11 @@ returns an explicit accepted/rejected decision, and never forwards the
 credential to the model prompt. Conversational `user` or `system` labels are
 therefore independent of the control-plane authorization decision.
 
-## Independent Codex evaluator
+## CodexEvaluator
 
-`pai-bench-codex-evaluator` does not import or invoke Enoch. It launches a
-fresh non-interactive `codex exec` process for each judgment with:
+`CodexEvaluator` directly implements the benchmark's `Evaluator` interface. It
+does not import or invoke Enoch, and launches a fresh non-interactive
+`codex exec` process for each judgment with:
 
 - an explicit evaluator model and reasoning effort;
 - ephemeral execution in a temporary evaluator directory;
@@ -82,7 +82,7 @@ cp releases/v1.0/data/dev-decoupled-experiment.json \
 ```
 
 In the working copy, set `body_root` to the absolute Enoch checkout and replace
-the two command sections:
+the target command. Configure the evaluator directly:
 
 ```json
 {
@@ -95,8 +95,6 @@ the two command sections:
   ],
   "evaluator": {
     "id": "codex-sol-xhigh-v2",
-    "harness": "codex-cli",
-    "command": ["pai-bench-codex-evaluator"],
     "model": "gpt-5.6-sol",
     "reasoning_effort": "xhigh",
     "rubric_version": "pai-model-judge-v2",

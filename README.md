@@ -8,8 +8,10 @@ pairs, divided into development, frozen factorial-test, and frozen
 source-challenge splits. Every identity uses the same 32 question templates.
 
 The repository is self-contained: it includes the installable Python package,
-tests, schemas, documentation, release generator, and frozen public data. It
-does not depend on a particular agent framework, model provider, or evaluator.
+tests, schemas, documentation, release generator, and frozen public data. The
+target contract is agent-framework and model-provider neutral. Evaluation is
+defined by a small `Evaluator` interface; the bundled implementation is
+`CodexEvaluator`.
 
 ## Install
 
@@ -18,10 +20,10 @@ python3 -m pip install .
 ```
 
 The package exposes the `identity-benchmark` and
-`identity-benchmark-replay` commands. It also includes optional
-`pai-bench-enoch-target` and `pai-bench-codex-evaluator` integrations. The
-checkout-local launchers under `bin/` select Python 3.11 or newer without
-requiring an installation.
+`identity-benchmark-replay` commands. It also includes the optional
+`pai-bench-enoch-target` integration and a directly importable
+`CodexEvaluator`. The checkout-local launchers under `bin/` select Python 3.11
+or newer without requiring an installation.
 
 ## Release layout
 
@@ -62,11 +64,12 @@ bin/identity-benchmark generate-vnext development/vnext --check
 
 ## Run a split
 
-The frozen manifests use provider-neutral target and evaluator adapter
-placeholders. Copy the selected decoupled manifest to an untracked working
-directory and replace `instance_command` and, when needed,
-`evaluator.command` with adapters for the system and judge being evaluated. Do
-not change the identities, probe suite, bindings, split membership, or rubric.
+The frozen manifests use a provider-neutral target placeholder and pin the
+Codex evaluator configuration. Copy the selected decoupled manifest to an
+untracked working directory and replace `instance_command` for the system
+being evaluated. Legacy frozen `evaluator.command` and `evaluator.harness`
+fields are accepted but ignored. Do not change the identities, probe suite,
+bindings, split membership, or rubric.
 
 ```bash
 bin/identity-benchmark matrix \
@@ -80,11 +83,11 @@ evaluation rules after inspecting responses from either frozen split.
 
 ## Adapter environment
 
-Experiment processes receive `IDENTITY_BENCHMARK_STATE_HOME`,
+Target processes receive `IDENTITY_BENCHMARK_STATE_HOME`,
 `IDENTITY_BENCHMARK_MODEL`, `IDENTITY_BENCHMARK_REASONING_EFFORT`,
 `IDENTITY_BENCHMARK_IDENTITY_MODE`, and `IDENTITY_BENCHMARK_RUN_ID`.
-Evaluator commands additionally receive the documented
-`IDENTITY_BENCHMARK_EVALUATOR_*` variables.
+The runner constructs `CodexEvaluator` directly from the evaluator section of
+the experiment manifest.
 
 In decoupled experiments, `{profile}` exposes only the identity contract to the
 target adapter. Questions and private scoring bindings stay runner-side. State

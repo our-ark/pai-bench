@@ -300,7 +300,7 @@ class BenchmarkReport:
     dimension_scores: dict[str, float]
     metric_scores: dict[str, float]
     results: tuple[ProbeResult, ...]
-    evaluator_id: str = "deterministic-v1"
+    evaluator_id: str
     protocol_version: int = INSTANCE_PROTOCOL_VERSION
     benchmark_version: int = SCHEMA_VERSION
 

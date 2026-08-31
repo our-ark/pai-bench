@@ -30,10 +30,11 @@ from identity_benchmark.runner import (
     validate_report_integrity,
 )
 from identity_benchmark.scoring import DeterministicScorer, ExpectationScorer
+from identity_benchmark.codex_evaluator import (
+    CodexEvaluator,
+    CodexEvaluatorError,
+)
 from identity_benchmark.evaluators import (
-    CommandEvaluator,
-    DeterministicEvaluator,
-    EVALUATOR_PROTOCOL_VERSION,
     EvaluationRequest,
     EvaluationResult,
     Evaluator,
@@ -97,16 +98,15 @@ __all__ = [
     "BenchmarkProfileError",
     "BenchmarkReport",
     "CommandAgentAdapter",
-    "CommandEvaluator",
+    "CodexEvaluator",
+    "CodexEvaluatorError",
     "CommandInstance",
     "DEFAULT_BOOTSTRAP_SAMPLES",
     "DEFAULT_BOOTSTRAP_SEED",
     "DEFAULT_CONFIDENCE_LEVEL",
     "DeterministicScorer",
-    "DeterministicEvaluator",
     "DEFAULT_SEED",
     "DEFAULT_SIZE",
-    "EVALUATOR_PROTOCOL_VERSION",
     "EvaluationResult",
     "EvaluationRequest",
     "Evaluator",

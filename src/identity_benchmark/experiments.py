@@ -8,7 +8,7 @@ import math
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Callable
 
 from identity_benchmark.target_adapters import CommandInstance
 from identity_benchmark.contracts import (
@@ -25,7 +25,8 @@ from identity_benchmark.runner import (
     run_benchmark,
     validate_report_integrity,
 )
-from identity_benchmark.evaluators import CommandEvaluator
+from identity_benchmark.codex_evaluator import CodexEvaluator
+from identity_benchmark.evaluators import Evaluator
 from identity_benchmark.probe_suites import (
     ProbeSuiteError,
     compile_benchmark_profile,
@@ -47,12 +48,13 @@ class ExperimentError(ValueError):
 @dataclass(frozen=True)
 class EvaluatorSpec:
     evaluator_id: str
-    harness: str
-    command: tuple[str, ...]
     model: str
     reasoning_effort: str
     rubric_version: str
     timeout_seconds: float = 600.0
+
+
+EvaluatorFactory = Callable[[EvaluatorSpec | None, Path], Evaluator]
 
 
 @dataclass(frozen=True)
@@ -492,7 +494,13 @@ def run_experiment(
     batch_size: int | None = None,
     batch_index: int = 1,
     resume: bool = False,
+    evaluator_factory: EvaluatorFactory | None = None,
 ) -> ExperimentReport:
+    active_evaluator_factory = evaluator_factory or _codex_evaluator
+    if evaluator_factory is None and spec.evaluator is None:
+        raise ExperimentError(
+            "experiment manifest must define a Codex evaluator"
+        )
     plan = plan_experiment(
         spec, batch_size=batch_size, batch_index=batch_index
     )
@@ -527,6 +535,7 @@ def run_experiment(
                 identity_mode=planned.identity_mode,
                 repetition=planned.repetition,
                 fingerprint=planned.fingerprint,
+                evaluator_factory=active_evaluator_factory,
             )
             runs_by_id[planned.run_id] = run
             _write_json(output / "runs" / f"{planned.run_id}.json", run.to_dict())
@@ -736,8 +745,6 @@ def _run_fingerprint(
     if spec.evaluator is not None:
         evaluator = {
             "id": spec.evaluator.evaluator_id,
-            "harness": spec.evaluator.harness,
-            "command": list(spec.evaluator.command),
             "model": spec.evaluator.model,
             "reasoning_effort": spec.evaluator.reasoning_effort,
             "rubric_version": spec.evaluator.rubric_version,
@@ -899,6 +906,7 @@ def _run_condition(
     reasoning_effort: str,
     identity_mode: str,
     repetition: int,
+    evaluator_factory: EvaluatorFactory,
     fingerprint: str = "",
 ) -> ExperimentRun:
     replacements = {
@@ -925,37 +933,9 @@ def _run_condition(
         },
         cwd=spec.body_root,
     )
-    evaluator = None
-    if spec.evaluator is not None:
-        evaluator_state = state_home / "evaluator"
-        evaluator_state.mkdir(mode=0o700)
-        evaluator_replacements = {
-            **replacements,
-            "state_home": str(evaluator_state),
-        }
-        evaluator_command = tuple(
-            _format_token(token, evaluator_replacements)
-            for token in spec.evaluator.command
-        )
-        evaluator = CommandEvaluator(
-            command=evaluator_command,
-            evaluator_id=spec.evaluator.evaluator_id,
-            timeout_seconds=spec.evaluator.timeout_seconds,
-            environment={
-                "IDENTITY_BENCHMARK_STATE_HOME": str(evaluator_state),
-                "IDENTITY_BENCHMARK_EVALUATOR_ID": spec.evaluator.evaluator_id,
-                "IDENTITY_BENCHMARK_EVALUATOR_HARNESS": spec.evaluator.harness,
-                "IDENTITY_BENCHMARK_EVALUATOR_MODEL": spec.evaluator.model,
-                "IDENTITY_BENCHMARK_EVALUATOR_REASONING_EFFORT": (
-                    spec.evaluator.reasoning_effort
-                ),
-                "IDENTITY_BENCHMARK_EVALUATOR_RUBRIC_VERSION": (
-                    spec.evaluator.rubric_version
-                ),
-                "IDENTITY_BENCHMARK_RUN_ID": run_id,
-            },
-            cwd=spec.body_root,
-        )
+    evaluator_state = state_home / "evaluator"
+    evaluator_state.mkdir(mode=0o700)
+    evaluator = evaluator_factory(spec.evaluator, evaluator_state)
     return ExperimentRun(
         run_id=run_id,
         profile_id=profile.profile_id,
@@ -1033,22 +1013,21 @@ def _evaluator_spec(value: object) -> EvaluatorSpec | None:
         "evaluator",
         required={
             "id",
-            "harness",
-            "command",
             "model",
             "reasoning_effort",
             "rubric_version",
         },
-        optional={"timeout_seconds"},
+        optional={"timeout_seconds", "harness", "command"},
     )
-    command = tuple(
-        _text(item, "evaluator.command[]")
-        for item in _nonempty_list(root["command"], "evaluator.command")
-    )
+    if "harness" in root:
+        _text(root["harness"], "evaluator.harness")
+    if "command" in root:
+        tuple(
+            _text(item, "evaluator.command[]")
+            for item in _nonempty_list(root["command"], "evaluator.command")
+        )
     return EvaluatorSpec(
         evaluator_id=_identifier(root["id"], "evaluator.id"),
-        harness=_text(root["harness"], "evaluator.harness"),
-        command=command,
         model=_text(root["model"], "evaluator.model"),
         reasoning_effort=_text(
             root["reasoning_effort"], "evaluator.reasoning_effort"
@@ -1059,6 +1038,24 @@ def _evaluator_spec(value: object) -> EvaluatorSpec | None:
         timeout_seconds=_positive_number(
             root.get("timeout_seconds", 600.0), "evaluator.timeout_seconds"
         ),
+    )
+
+
+def _codex_evaluator(
+    spec: EvaluatorSpec | None,
+    state_home: Path,
+) -> Evaluator:
+    if spec is None:
+        raise ExperimentError(
+            "experiment manifest must define a Codex evaluator"
+        )
+    return CodexEvaluator(
+        evaluator_id=spec.evaluator_id,
+        model=spec.model,
+        reasoning_effort=spec.reasoning_effort,
+        rubric_version=spec.rubric_version,
+        timeout_seconds=spec.timeout_seconds,
+        state_home=state_home,
     )
 
 

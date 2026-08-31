@@ -17,8 +17,8 @@ from identity_benchmark.experiments import (
     format_experiment_report,
     load_experiment_spec,
     plan_experiment,
-    run_experiment,
 )
+from evaluator_support import run_test_experiment as run_experiment
 
 
 PROFILE = FIXTURES / "synthetic-profile.json"

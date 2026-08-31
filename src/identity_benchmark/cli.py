@@ -4,9 +4,16 @@ import argparse
 import json
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 
 from identity_benchmark.target_adapters import CommandInstance, InstanceError
-from identity_benchmark.contracts import BenchmarkProfileError, BenchmarkReport, load_benchmark_profile
+from identity_benchmark.codex_evaluator import CodexEvaluator
+from identity_benchmark.contracts import (
+    BenchmarkProfileError,
+    BenchmarkReport,
+    load_benchmark_profile,
+)
+from identity_benchmark.evaluators import EvaluatorError
 from identity_benchmark.experiments import (
     ExperimentError,
     format_experiment_plan,
@@ -75,7 +82,12 @@ def main(argv: list[str] | None = None) -> None:
             return
         if args.action == "rescore":
             profile = load_benchmark_profile(args.profile)
-            report = rescore_saved_report(profile, args.report)
+            with TemporaryDirectory(prefix="pai-bench-rescore-") as state:
+                report = rescore_saved_report(
+                    profile,
+                    args.report,
+                    evaluator=_codex_evaluator_from_args(args, Path(state)),
+                )
             if args.json_out:
                 _write_report(args.json_out, report)
             print(format_report(report))
@@ -125,7 +137,12 @@ def main(argv: list[str] | None = None) -> None:
             instance_id=args.instance_id,
             timeout_seconds=args.timeout,
         )
-        report = run_benchmark(profile, instance)
+        with TemporaryDirectory(prefix="pai-bench-run-") as state:
+            report = run_benchmark(
+                profile,
+                instance,
+                evaluator=_codex_evaluator_from_args(args, Path(state)),
+            )
         if args.json_out:
             _write_report(args.json_out, report)
         print(format_report(report))
@@ -134,6 +151,7 @@ def main(argv: list[str] | None = None) -> None:
     except (
         BenchmarkProfileError,
         ExperimentError,
+        EvaluatorError,
         InstanceError,
         PopulationError,
         RescoreError,
@@ -211,6 +229,7 @@ def _parser() -> argparse.ArgumentParser:
     rescore.add_argument("profile", type=Path)
     rescore.add_argument("report", type=Path)
     rescore.add_argument("--json-out", type=Path)
+    _add_evaluator_arguments(rescore)
     bootstrap = subparsers.add_parser(
         "bootstrap",
         help="estimate clustered confidence intervals from saved matrix runs",
@@ -249,7 +268,35 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--timeout", type=float, default=120.0)
     run.add_argument("--minimum-score", type=_unit_score)
     run.add_argument("--json-out", type=Path)
+    _add_evaluator_arguments(run)
     return parser
+
+
+def _add_evaluator_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--evaluator-id", default="codex-evaluator")
+    parser.add_argument("--evaluator-model", required=True)
+    parser.add_argument("--evaluator-reasoning-effort", default="xhigh")
+    parser.add_argument(
+        "--evaluator-rubric-version",
+        default="pai-model-judge-v2",
+    )
+    parser.add_argument("--evaluator-timeout", type=float, default=600.0)
+    parser.add_argument("--codex-bin", default="")
+
+
+def _codex_evaluator_from_args(
+    args: argparse.Namespace,
+    state_home: Path,
+) -> CodexEvaluator:
+    return CodexEvaluator(
+        evaluator_id=args.evaluator_id,
+        model=args.evaluator_model,
+        reasoning_effort=args.evaluator_reasoning_effort,
+        rubric_version=args.evaluator_rubric_version,
+        timeout_seconds=args.evaluator_timeout,
+        codex_bin=args.codex_bin,
+        state_home=state_home,
+    )
 
 
 def _unit_score(value: str) -> float:

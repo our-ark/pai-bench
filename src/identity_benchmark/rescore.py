@@ -14,6 +14,7 @@ from identity_benchmark.contracts import (
     TransitionDecision,
     TransitionRequest,
 )
+from identity_benchmark.evaluators import Evaluator
 from identity_benchmark.runner import run_benchmark
 
 
@@ -62,7 +63,12 @@ class RecordedInstance:
         )
 
 
-def rescore_saved_report(profile: BenchmarkProfile, path: Path):
+def rescore_saved_report(
+    profile: BenchmarkProfile,
+    path: Path,
+    *,
+    evaluator: Evaluator,
+):
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
@@ -127,6 +133,7 @@ def rescore_saved_report(profile: BenchmarkProfile, path: Path):
             instance_id=f"{source_instance_id}:rescored",
             responses=responses,
         ),
+        evaluator=evaluator,
     )
 
 

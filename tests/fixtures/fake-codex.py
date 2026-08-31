@@ -5,10 +5,14 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 
 
 args = sys.argv[1:]
 prompt = sys.stdin.read()
+sleep = os.environ.get("FAKE_CODEX_SLEEP", "").strip()
+if sleep:
+    time.sleep(float(sleep))
 output = Path(args[args.index("--output-last-message") + 1])
 schema_index = args.index("--output-schema") + 1 if "--output-schema" in args else None
 record = {"args": args, "prompt": prompt}

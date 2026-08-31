@@ -20,7 +20,7 @@ from identity_benchmark.probe_suites import (
 )
 
 
-VNEXT_GENERATOR_VERSION = "pai-construct-vnext-dev.2"
+VNEXT_GENERATOR_VERSION = "pai-construct-vnext-dev.3"
 VNEXT_SUITE_ID = "pai-construct-vnext-dev.2"
 PROBES_PER_PROFILE = 25
 COMPOSITION_COMPONENTS = (
@@ -868,8 +868,6 @@ def _experiment_manifest(
         "identity_modes": ["installed"],
         "evaluator": {
             "id": "codex-sol-xhigh-v2",
-            "harness": "codex-cli",
-            "command": ["pai-bench-codex-evaluator"],
             "model": "gpt-5.6-sol",
             "reasoning_effort": "xhigh",
             "rubric_version": "pai-model-judge-v2",

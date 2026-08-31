@@ -16,14 +16,12 @@ from identity_benchmark.contracts import (
     TransitionRequest,
 )
 from identity_benchmark.evaluators import (
-    DeterministicEvaluator,
     EvaluationRequest,
     Evaluator,
     EvaluatorError,
 )
 from identity_benchmark.scoring import (
     DeterministicScorer,
-    ExpectationScorer,
     weighted_expectation_score,
 )
 
@@ -75,15 +73,10 @@ class ReportIntegrityError(ValueError):
 def run_benchmark(
     profile: BenchmarkProfile,
     instance: AgentAdapter,
-    scorer: ExpectationScorer | None = None,
-    evaluator: Evaluator | None = None,
+    *,
+    evaluator: Evaluator,
 ) -> BenchmarkReport:
     """Run every profile probe in an isolated target session."""
-    if scorer is not None and evaluator is not None:
-        raise ValueError("use either scorer or evaluator, not both")
-    active_evaluator = evaluator or DeterministicEvaluator(
-        scorer=scorer or DeterministicScorer()
-    )
     started_at = _now()
     results: list[ProbeResult] = []
     for probe in profile.probes:
@@ -158,7 +151,7 @@ def run_benchmark(
                 after_response=None,
                 reference_statements=(),
             )
-            evaluation = active_evaluator.evaluate(
+            evaluation = evaluator.evaluate(
                 EvaluationRequest(
                     profile_id=profile.profile_id,
                     statements=(
@@ -223,7 +216,7 @@ def run_benchmark(
         instance_id=instance.instance_id,
         started_at=started_at,
         finished_at=_now(),
-        evaluator_id=active_evaluator.evaluator_id,
+        evaluator_id=evaluator.evaluator_id,
         score=_headline_score(profile, materialized),
         dimension_scores=_dimension_scores(materialized),
         metric_scores=_metric_scores(profile, materialized),

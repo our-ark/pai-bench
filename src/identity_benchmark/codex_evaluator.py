@@ -1,21 +1,24 @@
 from __future__ import annotations
 
-import argparse
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 from typing import Any, Mapping
 
-from identity_benchmark.evaluators import EVALUATOR_PROTOCOL_VERSION, EvaluatorError
+from identity_benchmark.evaluators import (
+    EvaluationRequest,
+    EvaluationResult,
+    EvaluatorError,
+)
 from identity_benchmark.processes import run_text_command
 
 
-ADAPTER_ID = "pai-bench-codex-evaluator-v1"
+IMPLEMENTATION_ID = "codex-evaluator-v2"
 ALLOWED_SCORES = (0.0, 0.25, 0.5, 0.75, 1.0)
 RUBRIC_VERSIONS = ("pai-model-judge-v1", "pai-model-judge-v2")
 DEFAULT_TIMEOUT_SECONDS = 600.0
@@ -27,146 +30,148 @@ _REASONING_EFFORT = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 
 
 class CodexEvaluatorError(EvaluatorError):
-    """Raised when the independent Codex evaluator cannot score a probe."""
+    """Raised when Codex cannot score a probe."""
 
 
-def main(argv: list[str] | None = None) -> None:
-    parser = _parser()
-    args = parser.parse_args(argv)
-    try:
-        request = _read_request()
-        model = _required_environment("IDENTITY_BENCHMARK_EVALUATOR_MODEL")
-        reasoning_effort = _required_environment(
-            "IDENTITY_BENCHMARK_EVALUATOR_REASONING_EFFORT"
-        )
-        if not _REASONING_EFFORT.fullmatch(reasoning_effort):
+@dataclass(frozen=True)
+class CodexEvaluator:
+    """Evaluate one blinded probe with an isolated Codex CLI model judge."""
+
+    evaluator_id: str
+    model: str
+    reasoning_effort: str
+    state_home: Path
+    rubric_version: str = "pai-model-judge-v2"
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
+    codex_bin: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.evaluator_id.strip():
+            raise CodexEvaluatorError("evaluator id is required")
+        if not self.model.strip():
+            raise CodexEvaluatorError("evaluator model is required")
+        if not _REASONING_EFFORT.fullmatch(self.reasoning_effort):
             raise CodexEvaluatorError("evaluator reasoning effort is invalid")
-        state_home = _state_home()
-        result = evaluate_with_codex(
+        if self.rubric_version not in RUBRIC_VERSIONS:
+            raise CodexEvaluatorError(
+                "unsupported evaluator rubric version: " + self.rubric_version
+            )
+        if self.timeout_seconds <= 0:
+            raise CodexEvaluatorError("evaluator timeout must be positive")
+
+    def evaluate(self, request: EvaluationRequest) -> EvaluationResult:
+        executable, executable_source = resolve_codex_executable(self.codex_bin)
+        state_home = self.state_home.expanduser().resolve()
+        state_home.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(state_home, 0o700)
+        prompt = evaluator_prompt(
             request,
-            model=model,
-            reasoning_effort=reasoning_effort,
-            state_home=state_home,
-            codex_bin=args.codex_bin,
-            timeout_seconds=args.timeout_seconds,
+            rubric_version=self.rubric_version,
         )
-        json.dump(result, sys.stdout, ensure_ascii=False)
-    except (CodexEvaluatorError, OSError, ValueError) as error:
-        parser.exit(2, f"pai-bench-codex-evaluator: {error}\n")
+        with tempfile.TemporaryDirectory(
+            prefix="codex-evaluator-",
+            dir=state_home,
+        ) as raw:
+            work = Path(raw)
+            output_path = work / "score.json"
+            schema_path = work / "score.schema.json"
+            schema_path.write_text(
+                json.dumps(_score_schema(), indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            command = (
+                executable,
+                "exec",
+                "--cd",
+                str(work),
+                "--sandbox",
+                "read-only",
+                "--skip-git-repo-check",
+                "--ephemeral",
+                "--ignore-user-config",
+                "--ignore-rules",
+                "--color",
+                "never",
+                "--json",
+                "--output-schema",
+                str(schema_path),
+                "--output-last-message",
+                str(output_path),
+                "--model",
+                self.model,
+                "--config",
+                f'model_reasoning_effort="{self.reasoning_effort}"',
+                "-",
+            )
+            try:
+                completed = run_text_command(
+                    command,
+                    input_text=prompt,
+                    timeout_seconds=self.timeout_seconds,
+                    environment=os.environ,
+                    cwd=work,
+                )
+            except subprocess.TimeoutExpired as error:
+                raise CodexEvaluatorError(
+                    "Codex evaluator timed out after "
+                    f"{self.timeout_seconds:g} seconds"
+                ) from error
+            except (OSError, subprocess.SubprocessError) as error:
+                raise CodexEvaluatorError(
+                    f"Codex evaluator failed: {error}"
+                ) from error
+            if completed.returncode != 0:
+                detail = (
+                    completed.stderr.strip()
+                    or completed.stdout.strip()
+                    or "no output"
+                )
+                raise CodexEvaluatorError(
+                    "Codex evaluator exited with "
+                    f"{completed.returncode}: {_clip(detail)}"
+                )
+            if not output_path.is_file():
+                raise CodexEvaluatorError(
+                    "Codex evaluator did not write a final score"
+                )
+            score = _parse_score(output_path)
+            usage = _usage_from_jsonl(completed.stdout)
+        return EvaluationResult(
+            score=score,
+            metadata={
+                "implementation": IMPLEMENTATION_ID,
+                "evaluator_id": self.evaluator_id,
+                "harness": "codex-cli",
+                "model": self.model,
+                "reasoning_effort": self.reasoning_effort,
+                "rubric_version": self.rubric_version,
+                "codex_executable_source": executable_source,
+                **usage,
+            },
+        )
 
 
-def evaluate_with_codex(
-    request: Mapping[str, Any],
+def evaluator_prompt(
+    request: EvaluationRequest,
     *,
-    model: str,
-    reasoning_effort: str,
-    state_home: Path,
-    codex_bin: str = "",
-    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
-) -> dict[str, Any]:
-    if timeout_seconds <= 0:
-        raise CodexEvaluatorError("timeout must be positive")
-    if not model.strip():
-        raise CodexEvaluatorError("evaluator model is required")
-    if not _REASONING_EFFORT.fullmatch(reasoning_effort):
-        raise CodexEvaluatorError("evaluator reasoning effort is invalid")
-    executable, executable_source = resolve_codex_executable(codex_bin)
-    state_home.mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(state_home, 0o700)
-    rubric_version = os.environ.get(
-        "IDENTITY_BENCHMARK_EVALUATOR_RUBRIC_VERSION", ""
-    ).strip() or "pai-model-judge-v2"
+    rubric_version: str,
+) -> str:
     if rubric_version not in RUBRIC_VERSIONS:
         raise CodexEvaluatorError(
             "unsupported evaluator rubric version: " + rubric_version
         )
-    prompt = evaluator_prompt(request, rubric_version=rubric_version)
-    with tempfile.TemporaryDirectory(prefix="codex-evaluator-", dir=state_home) as raw:
-        work = Path(raw)
-        output_path = work / "score.json"
-        schema_path = work / "score.schema.json"
-        schema_path.write_text(
-            json.dumps(_score_schema(), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        command = (
-            executable,
-            "exec",
-            "--cd",
-            str(work),
-            "--sandbox",
-            "read-only",
-            "--skip-git-repo-check",
-            "--ephemeral",
-            "--ignore-user-config",
-            "--ignore-rules",
-            "--color",
-            "never",
-            "--json",
-            "--output-schema",
-            str(schema_path),
-            "--output-last-message",
-            str(output_path),
-            "--model",
-            model,
-            "--config",
-            f'model_reasoning_effort="{reasoning_effort}"',
-            "-",
-        )
-        try:
-            completed = run_text_command(
-                command,
-                input_text=prompt,
-                timeout_seconds=timeout_seconds,
-                environment=os.environ,
-                cwd=work,
-            )
-        except (OSError, subprocess.SubprocessError) as error:
-            raise CodexEvaluatorError(f"Codex evaluator failed: {error}") from error
-        if completed.returncode != 0:
-            detail = completed.stderr.strip() or completed.stdout.strip() or "no output"
-            raise CodexEvaluatorError(
-                f"Codex evaluator exited with {completed.returncode}: {_clip(detail)}"
-            )
-        if not output_path.is_file():
-            raise CodexEvaluatorError("Codex evaluator did not write a final score")
-        score = _parse_score(output_path)
-        usage = _usage_from_jsonl(completed.stdout)
-    return {
-        "protocol_version": EVALUATOR_PROTOCOL_VERSION,
-        "score": score,
-        "metadata": {
-            "adapter": ADAPTER_ID,
-            "evaluator_id": os.environ.get(
-                "IDENTITY_BENCHMARK_EVALUATOR_ID", ""
-            ).strip()
-            or ADAPTER_ID,
-            "harness": "codex-cli",
-            "model": model,
-            "reasoning_effort": reasoning_effort,
-            "rubric_version": rubric_version,
-            "codex_executable_source": executable_source,
-            **usage,
-        },
-    }
-
-
-def evaluator_prompt(
-    request: Mapping[str, Any],
-    *,
-    rubric_version: str,
-) -> str:
-    _validate_evaluator_request(request)
     statements = "\n".join(
-        f"- [{item['id']}] {item['content']}" for item in request["statements"]
+        f"- [{item.id}] {item.content}" for item in request.statements
     )
-    probe = request["probe"]
+    probe = request.probe
     conversation = "\n\n".join(
-        f"[{message['role']}]\n{message['content']}"
-        for message in probe["messages"]
+        f"[{message.role}]\n{message.content}" for message in probe.messages
     )
     expectations = json.dumps(
-        probe["expectations"], ensure_ascii=False, indent=2, sort_keys=True
+        [expectation.to_dict() for expectation in probe.expectations],
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=True,
     )
     strict_rubric = _rubric_text(rubric_version)
     return f"""You are an independent blinded evaluator for one Persistent Agent Identity probe.
@@ -185,9 +190,9 @@ Rubric version: {rubric_version}
 {statements}
 
 # Probe
-ID: {probe['id']}
-Dimension: {probe['dimension']}
-Tags: {', '.join(probe.get('tags', []))}
+ID: {probe.id}
+Dimension: {probe.dimension}
+Tags: {', '.join(probe.tags)}
 
 # Conversation
 {conversation}
@@ -196,7 +201,7 @@ Tags: {', '.join(probe.get('tags', []))}
 {expectations}
 
 # Target response
-{request['agent_response']}
+{request.agent_response}
 
 Return one JSON object matching the supplied output schema. Do not include a rationale.
 """
@@ -244,62 +249,13 @@ def resolve_codex_executable(configured: str = "") -> tuple[str, str]:
     )
 
 
-def _validate_evaluator_request(request: Mapping[str, Any]) -> None:
-    required = {"protocol_version", "profile_id", "statements", "probe", "agent_response"}
-    missing = sorted(required - set(request))
-    if missing:
-        raise CodexEvaluatorError(
-            "evaluator request is missing: " + ", ".join(missing)
-        )
-    if request["protocol_version"] != EVALUATOR_PROTOCOL_VERSION:
-        raise CodexEvaluatorError(
-            f"evaluator protocol_version must be {EVALUATOR_PROTOCOL_VERSION}"
-        )
-    if not isinstance(request["statements"], list) or not request["statements"]:
-        raise CodexEvaluatorError("evaluator statements must be a non-empty list")
-    for statement in request["statements"]:
-        if (
-            not isinstance(statement, dict)
-            or not isinstance(statement.get("id"), str)
-            or not statement["id"]
-            or not isinstance(statement.get("content"), str)
-            or not statement["content"]
-        ):
-            raise CodexEvaluatorError(
-                "each evaluator statement must contain non-empty id and content"
-            )
-    probe = request["probe"]
-    if not isinstance(probe, dict):
-        raise CodexEvaluatorError("evaluator probe must be an object")
-    if not isinstance(probe.get("id"), str) or not probe["id"]:
-        raise CodexEvaluatorError("evaluator probe id must be non-empty text")
-    if not isinstance(probe.get("dimension"), str) or not probe["dimension"]:
-        raise CodexEvaluatorError("evaluator probe dimension must be non-empty text")
-    messages = probe.get("messages")
-    expectations = probe.get("expectations")
-    tags = probe.get("tags", [])
-    if not isinstance(messages, list) or not messages:
-        raise CodexEvaluatorError("evaluator probe messages must be a non-empty list")
-    if not all(
-        isinstance(message, dict)
-        and message.get("role") in {"system", "user", "assistant"}
-        and isinstance(message.get("content"), str)
-        for message in messages
-    ):
-        raise CodexEvaluatorError("each evaluator message must contain role and content")
-    if not isinstance(expectations, list):
-        raise CodexEvaluatorError("evaluator probe expectations must be a list")
-    if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
-        raise CodexEvaluatorError("evaluator probe tags must be a text list")
-    if not isinstance(request["agent_response"], str):
-        raise CodexEvaluatorError("evaluator agent_response must be text")
-
-
 def _parse_score(path: Path) -> float:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (UnicodeError, json.JSONDecodeError) as error:
-        raise CodexEvaluatorError(f"Codex score is not valid JSON: {error}") from error
+        raise CodexEvaluatorError(
+            f"Codex score is not valid JSON: {error}"
+        ) from error
     if not isinstance(value, dict) or set(value) != {"score"}:
         raise CodexEvaluatorError("Codex score must contain only the score field")
     score = value["score"]
@@ -308,7 +264,8 @@ def _parse_score(path: Path) -> float:
     normalized = float(score)
     if normalized not in ALLOWED_SCORES:
         raise CodexEvaluatorError(
-            "Codex score must be one of: " + ", ".join(str(item) for item in ALLOWED_SCORES)
+            "Codex score must be one of: "
+            + ", ".join(str(item) for item in ALLOWED_SCORES)
         )
     return normalized
 
@@ -328,7 +285,9 @@ def _usage_from_jsonl(text: str) -> dict[str, int]:
         "cached_input_tokens": _usage_int(usage, "cached_input_tokens"),
         "output_tokens": _usage_int(usage, "output_tokens"),
         "reasoning_output_tokens": _usage_int(
-            usage, "reasoning_output_tokens", "reasoning_tokens"
+            usage,
+            "reasoning_output_tokens",
+            "reasoning_tokens",
         ),
     }
 
@@ -350,43 +309,5 @@ def _score_schema() -> dict[str, Any]:
     }
 
 
-def _read_request() -> dict[str, Any]:
-    try:
-        value = json.load(sys.stdin)
-    except (UnicodeError, json.JSONDecodeError) as error:
-        raise CodexEvaluatorError(f"stdin is not valid evaluator JSON: {error}") from error
-    if not isinstance(value, dict):
-        raise CodexEvaluatorError("stdin must contain one evaluator JSON object")
-    return value
-
-
-def _required_environment(name: str) -> str:
-    value = os.environ.get(name, "").strip()
-    if not value:
-        raise CodexEvaluatorError(f"{name} is required")
-    return value
-
-
-def _state_home() -> Path:
-    value = _required_environment("IDENTITY_BENCHMARK_STATE_HOME")
-    return Path(value).expanduser().resolve()
-
-
 def _clip(value: str, limit: int = 1000) -> str:
     return value if len(value) <= limit else value[:limit].rstrip() + "…"
-
-
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="pai-bench-codex-evaluator",
-        description="Score one PAI-Bench response with an independent Codex CLI judge.",
-    )
-    parser.add_argument("--codex-bin", default="")
-    parser.add_argument(
-        "--timeout-seconds", type=float, default=DEFAULT_TIMEOUT_SECONDS
-    )
-    return parser
-
-
-if __name__ == "__main__":
-    main()

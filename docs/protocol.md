@@ -143,11 +143,11 @@ not contaminate the remaining stateful sequence.
 
 ## Evaluator interface
 
-Deterministic expectations score exact, inclusion, exclusion, pattern, and
-format constraints. Open responses can additionally use a replaceable command
-evaluator. The evaluator receives the frozen reference contract, probe,
-observable expectations, and target response, then returns a score and
-provenance metadata. Target and evaluator adapters are independent.
+The benchmark defines an `Evaluator` interface over the frozen reference
+contract, probe, observable expectations, and target response. The bundled
+`CodexEvaluator` implements that interface with an isolated Codex model judge
+and returns a score plus provenance metadata. Target adapters and evaluation
+remain independent.
 
 Capability probes are controls, not identity measurements. They are reported
 separately and excluded from the headline identity score.
@@ -162,7 +162,8 @@ metrics, and capability controls remain excluded from the headline score.
 ## Experiment matrix
 
 An experiment manifest defines target models, reasoning efforts, identity
-modes, repetitions, command adapters, timeouts, and an optional evaluator.
+modes, repetitions, the target command, timeouts, and Codex evaluator
+configuration.
 
 ```bash
 bin/identity-benchmark matrix EXPERIMENT.json \

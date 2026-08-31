@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
+import time
 import unittest
 from unittest.mock import patch
 
@@ -14,14 +15,21 @@ sys.path.insert(0, str(ROOT / "src"))
 FAKE_CODEX = ROOT / "tests" / "fixtures" / "fake-codex.py"
 
 from identity_benchmark.codex_evaluator import (
-    ADAPTER_ID,
+    CodexEvaluator,
     CodexEvaluatorError,
-    evaluate_with_codex,
+    IMPLEMENTATION_ID,
 )
+from identity_benchmark.contracts import (
+    Expectation,
+    IdentityStatement,
+    Message,
+    Probe,
+)
+from identity_benchmark.evaluators import EvaluationRequest
 
 
-class CodexEvaluatorAdapterTests(unittest.TestCase):
-    def test_independent_codex_process_uses_isolated_noninteractive_flags(self) -> None:
+class CodexEvaluatorTests(unittest.TestCase):
+    def test_codex_evaluator_uses_isolated_noninteractive_flags(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
             log = root / "codex-log.json"
@@ -30,25 +38,27 @@ class CodexEvaluatorAdapterTests(unittest.TestCase):
                 {
                     "FAKE_CODEX_LOG": str(log),
                     "FAKE_CODEX_SCORE": "0.75",
-                    "IDENTITY_BENCHMARK_EVALUATOR_ID": "judge-v1",
-                    "IDENTITY_BENCHMARK_EVALUATOR_RUBRIC_VERSION": "pai-model-judge-v2",
                 },
                 clear=False,
             ):
-                result = evaluate_with_codex(
-                    _request(),
+                result = CodexEvaluator(
+                    evaluator_id="judge-v1",
                     model="judge-model",
                     reasoning_effort="xhigh",
                     state_home=root / "state",
+                    rubric_version="pai-model-judge-v2",
                     codex_bin=str(FAKE_CODEX),
                     timeout_seconds=5,
-                )
+                ).evaluate(_request())
             recorded = json.loads(log.read_text(encoding="utf-8"))
 
-        self.assertEqual(result["score"], 0.75)
-        self.assertEqual(result["metadata"]["adapter"], ADAPTER_ID)
-        self.assertEqual(result["metadata"]["evaluator_id"], "judge-v1")
-        self.assertEqual(result["metadata"]["input_tokens"], 21)
+        self.assertEqual(result.score, 0.75)
+        self.assertEqual(
+            result.metadata["implementation"],
+            IMPLEMENTATION_ID,
+        )
+        self.assertEqual(result.metadata["evaluator_id"], "judge-v1")
+        self.assertEqual(result.metadata["input_tokens"], 21)
         self.assertIn("--ephemeral", recorded["args"])
         self.assertIn("--ignore-user-config", recorded["args"])
         self.assertIn("--ignore-rules", recorded["args"])
@@ -80,44 +90,75 @@ class CodexEvaluatorAdapterTests(unittest.TestCase):
                 clear=False,
             ):
                 with self.assertRaisesRegex(
-                    CodexEvaluatorError, "must be one of"
+                    CodexEvaluatorError,
+                    "must be one of",
                 ):
-                    evaluate_with_codex(
-                        _request(),
+                    CodexEvaluator(
+                        evaluator_id="judge-v1",
                         model="judge-model",
                         reasoning_effort="high",
                         state_home=root / "state",
                         codex_bin=str(FAKE_CODEX),
                         timeout_seconds=5,
-                    )
+                    ).evaluate(_request())
 
-
-def _request() -> dict:
-    return {
-        "protocol_version": 1,
-        "profile_id": "profile-1",
-        "statements": [
-            {"id": "designation", "content": "The designation is VECTOR-9."}
-        ],
-        "probe": {
-            "id": "designation",
-            "dimension": "recognition",
-            "messages": [
-                {"role": "system", "content": "Use the installed identity."},
-                {"role": "user", "content": "State the designation."},
-            ],
-            "expectations": [
+    @unittest.skipIf(sys.platform == "win32", "requires POSIX process groups")
+    def test_timeout_is_reported_by_codex_evaluator(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.dict(
+                os.environ,
                 {
-                    "type": "contains",
-                    "value": "VECTOR-9",
-                    "weight": 1.0,
-                    "gate": True,
-                }
-            ],
-            "tags": ["identity-fact"],
-        },
-        "agent_response": "candidate response",
-    }
+                    "FAKE_CODEX_SLEEP": "30",
+                    "FAKE_CODEX_SCORE": "1",
+                },
+                clear=False,
+            ):
+                started = time.monotonic()
+                with self.assertRaisesRegex(
+                    CodexEvaluatorError,
+                    "timed out after 0.05 seconds",
+                ):
+                    CodexEvaluator(
+                        evaluator_id="judge-v1",
+                        model="judge-model",
+                        reasoning_effort="high",
+                        state_home=root / "state",
+                        codex_bin=str(FAKE_CODEX),
+                        timeout_seconds=0.05,
+                    ).evaluate(_request())
+                elapsed = time.monotonic() - started
+
+        self.assertLess(elapsed, 3.0)
+
+
+def _request() -> EvaluationRequest:
+    return EvaluationRequest(
+        profile_id="profile-1",
+        statements=(
+            IdentityStatement(
+                id="designation",
+                content="The designation is VECTOR-9.",
+            ),
+        ),
+        probe=Probe(
+            id="designation",
+            dimension="recognition",
+            messages=(
+                Message(role="system", content="Use the installed identity."),
+                Message(role="user", content="State the designation."),
+            ),
+            expectations=(
+                Expectation(
+                    type="contains",
+                    value="VECTOR-9",
+                    gate=True,
+                ),
+            ),
+            tags=("identity-fact",),
+        ),
+        agent_response="candidate response",
+    )
 
 
 if __name__ == "__main__":

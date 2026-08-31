@@ -9,6 +9,7 @@ import sys
 from tempfile import TemporaryDirectory
 import time
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,9 +31,9 @@ from identity_benchmark.contracts import (
     parse_instance_response,
     parse_transition_request,
 )
-from identity_benchmark.runner import run_benchmark
 from identity_benchmark.rescore import RescoreError, rescore_saved_report
 from identity_benchmark.scoring import DeterministicScorer, weighted_expectation_score
+from evaluator_support import TEST_EVALUATOR, run_test_benchmark as run_benchmark
 
 
 PROFILE = FIXTURES / "synthetic-profile.json"
@@ -528,7 +529,10 @@ class IdentityBenchmarkTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             report_path = Path(directory) / "report.json"
             output = StringIO()
-            with redirect_stdout(output):
+            with redirect_stdout(output), patch(
+                "identity_benchmark.cli.CodexEvaluator",
+                return_value=TEST_EVALUATOR,
+            ):
                 main(
                     [
                         "run",
@@ -537,6 +541,8 @@ class IdentityBenchmarkTests(unittest.TestCase):
                         "synthetic-reference",
                         "--json-out",
                         str(report_path),
+                        "--evaluator-model",
+                        "judge-model",
                         "--",
                         sys.executable,
                         str(INSTANCE),
@@ -569,7 +575,11 @@ class IdentityBenchmarkTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rescored = rescore_saved_report(profile, source_path)
+            rescored = rescore_saved_report(
+                profile,
+                source_path,
+                evaluator=TEST_EVALUATOR,
+            )
 
         self.assertEqual(rescored.score, 1.0)
         self.assertEqual(rescored.instance_id, "synthetic-source:rescored")
@@ -622,7 +632,11 @@ class IdentityBenchmarkTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            rescored = rescore_saved_report(profile, source_path)
+            rescored = rescore_saved_report(
+                profile,
+                source_path,
+                evaluator=TEST_EVALUATOR,
+            )
 
         self.assertEqual(rescored.score, 1.0)
         self.assertEqual(
@@ -649,7 +663,11 @@ class IdentityBenchmarkTests(unittest.TestCase):
             )
 
             with self.assertRaisesRegex(RescoreError, "probe set differs"):
-                rescore_saved_report(profile, source_path)
+                rescore_saved_report(
+                    profile,
+                    source_path,
+                    evaluator=TEST_EVALUATOR,
+                )
 
 
 class _FailingInstance:

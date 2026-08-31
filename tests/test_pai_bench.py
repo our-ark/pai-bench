@@ -23,7 +23,7 @@ from identity_benchmark.pai_bench import (
     SOURCE_SEED,
     SPLIT_PAIR_NUMBERS,
 )
-from identity_benchmark.runner import run_benchmark
+from evaluator_support import run_test_benchmark as run_benchmark
 from identity_benchmark.probe_suites import (
     compile_benchmark_profile,
     load_identity_profile,
