@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use PAI-Bench, please cite this software release."
+title: "PAI-Bench: A Benchmark for Persistent Identity in Deployed AI Agents"
+type: software
+authors:
+  - family-names: Zhao
+    given-names: Zhenyu
+  - family-names: Zhao
+    given-names: Roy
+version: 1.0.0
+date-released: 2026-08-30
+license: Apache-2.0
+repository-code: "https://github.com/our-ark/pai-bench"
+url: "https://github.com/our-ark/pai-bench"
+keywords:
+  - persistent agent identity
+  - AI agents
+  - benchmark
+  - identity consistency
+  - model evaluation

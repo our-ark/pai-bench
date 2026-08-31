@@ -1,0 +1,135 @@
+# PAI-Bench
+
+PAI-Bench evaluates whether a deployed agent can recover, compose, enact, and
+govern a persistent identity. It separates the identity installed in the
+target from the questions and evaluator-private scoring rules.
+
+The public v1.0 release contains 24 synthetic identities in 12 matched pairs,
+three prespecified splits, and 32 shared probe templates. See
+[the package README](../README.md).
+
+## Install the runner
+
+```bash
+python3 -m pip install .
+identity-benchmark --help
+```
+
+Inside this checkout, `bin/identity-benchmark` runs the
+same CLI without an installation.
+
+## Three-part benchmark source
+
+Each runnable case is compiled from:
+
+1. an identity-only profile containing the stable contract;
+2. `probe-suite.json`, containing the shared question templates; and
+3. a private binding file containing variables, observable expectations, and
+   authorized state transitions for that identity.
+
+The target receives only a probe's conversation messages. It never receives
+the reference statements, expected answer, evaluator rubric, or private
+binding. A target adapter may install the identity through its normal identity
+mechanism before answering.
+
+The release also retains self-contained compiled profiles. They are immutable
+compatibility snapshots for reproducing the release compilation and are not
+the preferred authoring format.
+
+## Target adapter protocol
+
+An experiment launches a fresh target command for every probe and writes one
+JSON request to standard input:
+
+```json
+{
+  "protocol_version": 1,
+  "profile_id": "profile-001",
+  "probe_id": "designation-atomic",
+  "messages": [{"role": "user", "content": "Identify yourself."}]
+}
+```
+
+The command returns exactly one JSON object:
+
+```json
+{
+  "protocol_version": 1,
+  "response": "I am CEDAR-ARCH-03.",
+  "metadata": {"adapter": "my-agent-v1"}
+}
+```
+
+Adapters receive the selected model, reasoning effort, isolated state path,
+identity mode, and run ID through `IDENTITY_BENCHMARK_*` environment
+variables. The interface can wrap a local process, HTTP endpoint, message
+transport, or another agent harness.
+
+The `{profile}` command placeholder always resolves to the identity-only input
+profile in decoupled experiments. Compiled probes, expectations, reference
+statements, and private bindings remain inside the benchmark runner and
+evaluator.
+
+If a probe prescribes an authorized state change, the runner first collects
+the target response and then invokes the same adapter with a separate control
+request:
+
+```json
+{
+  "protocol_version": 1,
+  "operation": "apply_transition",
+  "profile_id": "profile-001",
+  "probe_id": "authorized-correction",
+  "transition": {
+    "type": "replace-agent-identity",
+    "agent_identity": {"schema_version": 1}
+  }
+}
+```
+
+The adapter applies the transition without exposing it to the inference call
+and returns `{"protocol_version": 1, "applied": true}`. The ordinary response
+request never contains transition or scoring data.
+
+## Evaluator interface
+
+Deterministic expectations score exact, inclusion, exclusion, pattern, and
+format constraints. Open responses can additionally use a replaceable command
+evaluator. The evaluator receives the frozen reference contract, probe,
+observable expectations, and target response, then returns a score and
+provenance metadata. Target and evaluator adapters are independent.
+
+Capability probes are controls, not identity measurements. They are reported
+separately and excluded from the headline identity score.
+
+## Experiment matrix
+
+An experiment manifest defines target models, reasoning efforts, identity
+modes, repetitions, command adapters, timeouts, and an optional evaluator.
+
+```bash
+bin/identity-benchmark matrix EXPERIMENT.json \
+  --output-dir .pai-bench/reports/run-001 \
+  --batch-size 4 --batch-index 1 --resume
+```
+
+Use `--plan` before launching a campaign. Runs are atomic and resumable.
+Reports include per-probe results, identity dimensions, counterfactual-pair
+metrics, capability controls, constraint agreement, error counts, and adapter
+provenance.
+
+Completed reports can be replayed through a second evaluator or analyzed with
+clustered bootstrap confidence intervals without calling the target again.
+
+## Frozen release policy
+
+The development split permits pipeline work. The factorial-test and
+source-challenge splits are frozen. Do not tune prompts, adapters, or judging
+rules after inspecting frozen responses. `protocol.json` records this policy,
+and `bin/release --check` verifies every generated release
+file. Resume and experiment analysis also recompute report aggregates from the
+saved per-probe results and reject mismatches.
+
+The retained `identity-publication-v4.2` strings are internal provenance IDs
+for the freeze that became public PAI-Bench v1.0; they are not separate public
+versions.

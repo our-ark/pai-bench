@@ -1,0 +1,76 @@
+# PAI-Bench
+
+PAI-Bench is a provider-neutral benchmark for persistent identity in deployed
+AI agents. The current public release is **v1.0.0**.
+
+PAI-Bench v1.0 contains 24 synthetic identities in 12 matched counterfactual
+pairs, divided into development, frozen factorial-test, and frozen
+source-challenge splits. Every identity uses the same 32 question templates.
+
+The repository is self-contained: it includes the installable Python package,
+tests, schemas, documentation, release generator, and frozen public data. It
+does not depend on a particular agent framework, model provider, or evaluator.
+
+## Install
+
+```bash
+python3 -m pip install .
+```
+
+The package exposes the `identity-benchmark` and
+`identity-benchmark-replay` commands. The checkout-local launchers under
+`bin/` select Python 3.11 or newer without requiring an installation.
+
+## Release layout
+
+The frozen release is stored under [`releases/v1.0/data/`](releases/v1.0/data/):
+
+- `probe-suite.json`: the shared question templates;
+- `identities/`: portable identity contracts without benchmark questions;
+- `bindings/`: evaluator-private variables, transitions, and scoring oracles;
+- `*-decoupled-experiment.json`: frozen reference split manifests;
+- `protocol.json`: split, freeze, and no-test-tuning policy; and
+- `profiles/`: immutable compiled snapshots retained to reproduce the release
+  compilation byte for byte.
+
+The `identity-publication-v4.2` generator value and `-publication-v4` profile
+suffixes are provenance identifiers from development. They are not separate
+public benchmark versions. The public release version is recorded in
+[`VERSION`](VERSION).
+
+## Verify the release
+
+```bash
+bin/release --check
+```
+
+## Run a split
+
+The frozen manifests use provider-neutral target and evaluator adapter
+placeholders. Copy the selected decoupled manifest to an untracked working
+directory and replace `instance_command` and, when needed,
+`evaluator.command` with adapters for the system and judge being evaluated. Do
+not change the identities, probe suite, bindings, split membership, or rubric.
+
+```bash
+bin/identity-benchmark matrix \
+  .pai-bench/experiments/test.json \
+  --output-dir .pai-bench/reports/pai-bench-v1-test \
+  --resume
+```
+
+Use the development split for pipeline work. Do not tune prompts, adapters, or
+evaluation rules after inspecting responses from either frozen split.
+
+## Adapter environment
+
+Experiment processes receive `IDENTITY_BENCHMARK_STATE_HOME`,
+`IDENTITY_BENCHMARK_MODEL`, `IDENTITY_BENCHMARK_REASONING_EFFORT`,
+`IDENTITY_BENCHMARK_IDENTITY_MODE`, and `IDENTITY_BENCHMARK_RUN_ID`.
+Evaluator commands additionally receive the documented
+`IDENTITY_BENCHMARK_EVALUATOR_*` variables.
+
+In decoupled experiments, `{profile}` exposes only the identity contract to the
+target adapter. Questions and private scoring bindings stay runner-side. State
+transitions use a separate adapter control call after inference; see the
+[protocol](docs/protocol.md).
