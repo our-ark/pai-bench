@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 FIXTURES = ROOT / "tests" / "fixtures"
 
-from identity_benchmark.adapters import CommandInstance, InstanceError
+from identity_benchmark.target_adapters import CommandInstance, InstanceError
 from identity_benchmark.cli import main
 from identity_benchmark.contracts import (
     BenchmarkProfileError,

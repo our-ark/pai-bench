@@ -10,7 +10,7 @@ import re
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from identity_benchmark.adapters import CommandInstance
+from identity_benchmark.target_adapters import CommandInstance
 from identity_benchmark.contracts import (
     BenchmarkProfile,
     BenchmarkProfileError,

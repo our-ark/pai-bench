@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 import math
 
-from identity_benchmark.adapters import AgentAdapter, InstanceError
+from identity_benchmark.target_adapters import AgentAdapter, InstanceError
 from identity_benchmark.contracts import (
     BenchmarkProfile,
     BenchmarkReport,

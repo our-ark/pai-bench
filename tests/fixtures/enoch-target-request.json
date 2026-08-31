@@ -1,0 +1,11 @@
+{
+  "protocol_version": 1,
+  "profile_id": "population-p002-a-publication-v4",
+  "probe_id": "designation-atomic",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Return the stable designation."
+    }
+  ]
+}

@@ -15,6 +15,8 @@ Issues = "https://github.com/our-ark/pai-bench/issues"
 [project.scripts]
 identity-benchmark = "identity_benchmark.cli:main"
 identity-benchmark-replay = "identity_benchmark.replay:main"
+pai-bench-codex-evaluator = "identity_benchmark.codex_evaluator:main"
+pai-bench-enoch-target = "identity_benchmark.integrations.enoch_target:main"
 
 [build-system]
 requires = ["setuptools>=77"]

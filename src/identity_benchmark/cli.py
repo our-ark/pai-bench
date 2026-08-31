@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import sys
 
-from identity_benchmark.adapters import CommandInstance, InstanceError
+from identity_benchmark.target_adapters import CommandInstance, InstanceError
 from identity_benchmark.contracts import BenchmarkProfileError, BenchmarkReport, load_benchmark_profile
 from identity_benchmark.experiments import (
     ExperimentError,

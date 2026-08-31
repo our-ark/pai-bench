@@ -65,6 +65,11 @@ identity mode, and run ID through `IDENTITY_BENCHMARK_*` environment
 variables. The interface can wrap a local process, HTTP endpoint, message
 transport, or another agent harness.
 
+The provider-neutral command implementation lives in
+`identity_benchmark.target_adapters`. Optional target-specific implementations
+and independent evaluators are documented in
+[target and evaluator integrations](integrations.md).
+
 The `{profile}` command placeholder always resolves to the identity-only input
 profile in decoupled experiments. Compiled probes, expectations, reference
 statements, and private bindings remain inside the benchmark runner and

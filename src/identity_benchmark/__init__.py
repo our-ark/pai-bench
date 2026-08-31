@@ -1,6 +1,6 @@
 """Provider-neutral identity consistency benchmark."""
 
-from identity_benchmark.adapters import (
+from identity_benchmark.target_adapters import (
     AgentAdapter,
     CommandAgentAdapter,
     CommandInstance,

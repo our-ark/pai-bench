@@ -18,8 +18,10 @@ python3 -m pip install .
 ```
 
 The package exposes the `identity-benchmark` and
-`identity-benchmark-replay` commands. The checkout-local launchers under
-`bin/` select Python 3.11 or newer without requiring an installation.
+`identity-benchmark-replay` commands. It also includes optional
+`pai-bench-enoch-target` and `pai-bench-codex-evaluator` integrations. The
+checkout-local launchers under `bin/` select Python 3.11 or newer without
+requiring an installation.
 
 ## Release layout
 
@@ -73,4 +75,5 @@ Evaluator commands additionally receive the documented
 In decoupled experiments, `{profile}` exposes only the identity contract to the
 target adapter. Questions and private scoring bindings stay runner-side. State
 transitions use a separate adapter control call after inference; see the
-[protocol](docs/protocol.md).
+[protocol](docs/protocol.md). For the Enoch target and independent Codex judge,
+see [target and evaluator integrations](docs/integrations.md).
