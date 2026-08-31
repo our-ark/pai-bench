@@ -18,9 +18,12 @@ target model and reasoning effort.
 
 For `installed` mode, the runner calls `AgentAdapter.set_identity()` exactly
 once before inference. `EnochAdapter` maps that operation to the run's private
-`self.json` and locks the state directory to the profile. Later probes read the
-installed document, so an authorized transition persists for the rest of that
-isolated run. Repeating `set_identity()` with the same document is idempotent;
+`self.json` and locks the state directory to the profile. The file is written
+once during setup, but Enoch natively reloads it into target-visible startup
+context for every fresh probe session. The adapter sends only the ordinary
+probe conversation; it does not append identity text to that conversation.
+An authorized transition therefore persists for the rest of that isolated
+run. Repeating `set_identity()` with the same document is idempotent;
 attempting to replace it through this initialization interface is rejected and
 must use the governed transition control plane. Initial identities, transitions,
 and rollbacks all pass through the packaged runtime copy of the public
@@ -29,12 +32,12 @@ remain byte-identical. The adapter receives only the identity profile and probe
 conversation; expectations, reference statements, bindings, and judge rubrics
 stay runner-side.
 
-This installed-identity overlay is owned by the integration because the
-current Enoch runtime does not expose a native portable Agent Identity
-installation API. The resulting `self.json` is isolated under the adapter's
-per-run `state_home`, separate from the user's Enoch memory and normal instance
-state. If Enoch later gains that API, this implementation can delegate
-installation to it without changing the benchmark protocol.
+The resulting `self.json` is isolated under the adapter's per-run `state_home`,
+separate from the user's Enoch memory and normal instance state. Enoch's normal
+startup path treats versioned `body.yaml` and private `self.json` as distinct
+inputs: the former identifies the executable body, while the latter carries
+the portable personal identity. The benchmark adapter owns profile locking and
+governed transitions; Enoch owns startup consumption.
 
 The Enoch integration also supports vNext `attempt_transition` control calls.
 It validates the synthetic capability envelope before changing `self.json`,

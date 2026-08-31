@@ -89,6 +89,10 @@ identity changes use the separate governed transition interface. Initial and
 transition identities share the strict portable schema in
 `specs/ai-agent-identity.schema.json`.
 
+For Enoch, `set_identity()` installs private `self.json` once per isolated
+condition. Enoch itself reloads that document into startup context for every
+fresh probe session; the adapter forwards only the ordinary probe conversation.
+
 Use the development split for pipeline work. Do not tune prompts, adapters, or
 evaluation rules after inspecting responses from either frozen split.
 

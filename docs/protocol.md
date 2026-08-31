@@ -31,6 +31,11 @@ The target receives only the identity passed to `set_identity()` and a probe's
 conversation messages. It never receives the reference statements, expected
 answer, evaluator rubric, or private binding. A target adapter maps the
 explicit identity setup call to its normal identity mechanism before answering.
+For the bundled Enoch integration, setup writes private `self.json` once and
+Enoch reloads that file through its normal startup context for every fresh
+probe session. “Installed once” describes the storage operation; it does not
+mean the model sees the identity only once. The adapter never copies the
+identity into the ordinary probe message.
 
 The release also retains self-contained compiled profiles. They are immutable
 compatibility snapshots for reproducing the release compilation and are not

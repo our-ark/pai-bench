@@ -67,7 +67,9 @@ class EnochAdapterTests(unittest.TestCase):
             installed["identity"]["names"]["canonical"],
             "FABLE-JUNCTION-02",
         )
-        self.assertIn("FABLE-JUNCTION-02", prompts[0])
+        self.assertNotIn("FABLE-JUNCTION-02", prompts[0])
+        self.assertNotIn("# Personal Agent Identity", prompts[0])
+        self.assertIn("# Conversation", prompts[0])
         self.assertIn("Return the stable designation.", prompts[0])
         self.assertNotIn("expectations", prompts[0])
         self.assertNotIn("reference_statements", prompts[0])

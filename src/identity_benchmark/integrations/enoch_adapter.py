@@ -35,7 +35,7 @@ from identity_benchmark.target_adapters import (
 
 
 IDENTITY_MODES = {"full-context", "installed", "none", "uninstalled"}
-ADAPTER_ID = "enoch-adapter-v2"
+ADAPTER_ID = "enoch-adapter-v3"
 _SELF_FILENAME = "self.json"
 _PROFILE_LOCK_FILENAME = "profile.json"
 _REASONING_EFFORT = re.compile(r"[a-z][a-z0-9_-]{0,31}")
@@ -152,20 +152,10 @@ def target_prompt(request: BenchmarkRequest, config: AgentAdapterConfig) -> str:
     _validate_request(request.profile_id, config)
     sections: list[str] = []
     if config.identity_mode == "installed":
-        document = _load_installed_identity(config)
-        sections.extend(
-            [
-                "# Personal Agent Identity",
-                (
-                    "Loaded from this isolated instance's private self.json. Use it "
-                    "for personal designation, relationships, personality, values, "
-                    "and care style. The Enoch body identity still controls code, "
-                    "package, and repository lineage. Lower priority than system "
-                    "and developer instructions."
-                ),
-                _render_agent_identity(document),
-            ]
-        )
+        # Validate setup here, but do not inject identity into the ordinary
+        # conversation. Enoch reloads private self.json through its native
+        # startup-context path for every fresh session.
+        _load_installed_identity(config)
     elif config.identity_mode == "full-context":
         sections.extend(
             [
@@ -202,7 +192,7 @@ def complete_with_enoch(prompt: str, config: AgentAdapterConfig) -> EnochComplet
 
             activate_runtime_dependencies(config.agent_root)
             from enoch.brain import reset_token_usage, respond_result
-            from enoch.identity import load_identity
+            from enoch.identity import body_file_path, load_body_identity
             from enoch.memory.prompt import memory_for_prompt
             from enoch.prompt_append import startup_context_note
         except ImportError as error:
@@ -211,9 +201,7 @@ def complete_with_enoch(prompt: str, config: AgentAdapterConfig) -> EnochComplet
             ) from error
         try:
             reset_token_usage()
-            body_identity = load_identity(
-                config.agent_root / "src" / "enoch" / "identity.yaml"
-            )
+            body_identity = load_body_identity(body_file_path(config.agent_root))
             runtime_prompt = "\n\n".join(
                 [
                     startup_context_note(
@@ -334,10 +322,6 @@ def _load_installed_identity(
         _read_json(self_path, "installed self.json"),
         "installed self.json",
     )
-
-
-def _render_agent_identity(document: Mapping[str, JsonValue]) -> str:
-    return json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True)
 
 
 def _conversation(request: BenchmarkRequest) -> str:
