@@ -4,7 +4,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 import math
 
-from identity_benchmark.target_adapters import AgentAdapter, InstanceError
+from identity_benchmark.target_adapters import AgentAdapter, AgentAdapterError
 from identity_benchmark.contracts import (
     BenchmarkProfile,
     BenchmarkReport,
@@ -91,8 +91,8 @@ def run_benchmark(
             if probe.before_response is not None:
                 attempt_transition = getattr(instance, "attempt_transition", None)
                 if attempt_transition is None:
-                    raise InstanceError(
-                        "Instance adapter does not support transition attempts."
+                    raise AgentAdapterError(
+                        "Agent adapter does not support transition attempts."
                     )
                 transition_attempt_started = True
                 transition_decision = attempt_transition(
@@ -107,8 +107,8 @@ def run_benchmark(
             if probe.after_response is not None:
                 apply_transition = getattr(instance, "apply_transition", None)
                 if apply_transition is None:
-                    raise InstanceError(
-                        "Instance adapter does not support state transitions."
+                    raise AgentAdapterError(
+                        "Agent adapter does not support state transitions."
                     )
                 apply_transition(
                     TransitionRequest(
@@ -117,7 +117,7 @@ def run_benchmark(
                         transition=probe.after_response,
                     )
                 )
-        except InstanceError as error:
+        except AgentAdapterError as error:
             cleanup_error = _recover_failed_probe_transition(
                 profile,
                 probe,
@@ -428,7 +428,7 @@ def _recover_failed_probe_transition(
         return ""
     apply_transition = getattr(instance, "apply_transition", None)
     if apply_transition is None:
-        return "Instance adapter does not support recovery transitions."
+        return "Agent adapter does not support recovery transitions."
     try:
         apply_transition(
             TransitionRequest(
@@ -437,7 +437,7 @@ def _recover_failed_probe_transition(
                 transition=probe.after_response,
             )
         )
-    except InstanceError as error:
+    except AgentAdapterError as error:
         return str(error)
     return ""
 

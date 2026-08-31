@@ -30,15 +30,6 @@
   "identity_modes": [
     "installed"
   ],
-  "instance_command": [
-    "pai-bench-enoch-target",
-    "--profile",
-    "{profile}",
-    "--identity-mode",
-    "{identity_mode}",
-    "--enoch-root",
-    "{body_root}"
-  ],
   "models": [
     "gpt-5.6-luna"
   ],

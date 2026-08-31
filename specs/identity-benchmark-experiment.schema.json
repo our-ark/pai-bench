@@ -9,7 +9,6 @@
     "schema_version",
     "experiment_id",
     "body_root",
-    "instance_command",
     "models",
     "reasoning_efforts",
     "identity_modes"
@@ -62,7 +61,9 @@
     "instance_command": {
       "type": "array",
       "minItems": 1,
-      "items": {"type": "string", "minLength": 1}
+      "items": {"type": "string", "minLength": 1},
+      "deprecated": true,
+      "description": "Legacy v1 field accepted for frozen-manifest compatibility; EnochAdapter is selected directly and this command is not executed."
     },
     "models": {
       "type": "array",

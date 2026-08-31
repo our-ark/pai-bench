@@ -2,12 +2,15 @@
 
 from identity_benchmark.target_adapters import (
     AgentAdapter,
-    CommandAgentAdapter,
-    CommandInstance,
-    InstanceAdapter,
-    InstanceError,
+    AgentAdapterConfig,
+    AgentAdapterError,
+    AgentFactory,
     TransitionAdapter,
     TransitionAttemptAdapter,
+)
+from identity_benchmark.integrations.enoch_adapter import (
+    EnochAdapter,
+    EnochAdapterError,
 )
 from identity_benchmark.contracts import (
     AuthorizationEnvelope,
@@ -93,14 +96,15 @@ from identity_benchmark.vnext import (
 
 __all__ = [
     "AgentAdapter",
+    "AgentAdapterConfig",
+    "AgentAdapterError",
+    "AgentFactory",
     "AuthorizationEnvelope",
     "BenchmarkProfile",
     "BenchmarkProfileError",
     "BenchmarkReport",
-    "CommandAgentAdapter",
     "CodexEvaluator",
     "CodexEvaluatorError",
-    "CommandInstance",
     "DEFAULT_BOOTSTRAP_SAMPLES",
     "DEFAULT_BOOTSTRAP_SEED",
     "DEFAULT_CONFIDENCE_LEVEL",
@@ -116,9 +120,9 @@ __all__ = [
     "ExperimentError",
     "ExperimentReport",
     "ExperimentSpec",
+    "EnochAdapter",
+    "EnochAdapterError",
     "GENERATOR_VERSION",
-    "InstanceAdapter",
-    "InstanceError",
     "IdentityProfile",
     "PopulationError",
     "PAI_BENCH_VERSION",

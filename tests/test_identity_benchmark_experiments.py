@@ -22,8 +22,6 @@ from evaluator_support import run_test_experiment as run_experiment
 
 
 PROFILE = FIXTURES / "synthetic-profile.json"
-INSTANCE = FIXTURES / "synthetic-instance.py"
-PRIVACY_INSTANCE = FIXTURES / "privacy-instance.py"
 VECTOR_NORTH = FIXTURES / "counterfactual" / "vector-north.json"
 VECTOR_SOUTH = VECTOR_NORTH.with_name("vector-south.json")
 
@@ -38,7 +36,6 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
                     "experiment_id": "resumable-fixture",
                     "profile": str(PROFILE),
                     "body_root": str(ROOT),
-                    "instance_command": [sys.executable, str(INSTANCE)],
                     "models": ["model-a"],
                     "reasoning_efforts": ["medium"],
                     "identity_modes": ["none", "full-context"],
@@ -62,7 +59,6 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
                         "experiment_id": "fixture-matrix",
                         "profile": str(PROFILE),
                         "body_root": str(ROOT),
-                        "instance_command": [sys.executable, str(INSTANCE)],
                         "models": ["model-a"],
                         "reasoning_efforts": ["medium"],
                         "identity_modes": ["none", "full-context"],
@@ -187,12 +183,6 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
                         "probe_suite": str(suite),
                         "probe_bindings": {"identity-a": str(bindings)},
                         "body_root": str(ROOT),
-                        "instance_command": [
-                            sys.executable,
-                            str(PRIVACY_INSTANCE),
-                            "--profile",
-                            "{profile}",
-                        ],
                         "models": ["model-a"],
                         "reasoning_efforts": ["medium"],
                         "identity_modes": ["installed"],
@@ -208,7 +198,6 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
             metadata = report.runs[0].report.results[0].metadata
 
         self.assertEqual(report.runs[0].report.score, 1.0)
-        self.assertEqual(metadata["profile_path"], str(identity.resolve()))
         self.assertTrue(
             {"probes", "expectations", "reference_statements"}.isdisjoint(
                 metadata["profile_keys"]
@@ -228,7 +217,6 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
                         "experiment_id": "counterfactual-fixture",
                         "profiles": [str(VECTOR_NORTH), str(VECTOR_SOUTH)],
                         "body_root": str(ROOT),
-                        "instance_command": [sys.executable, str(INSTANCE)],
                         "models": ["model-a"],
                         "reasoning_efforts": ["low"],
                         "identity_modes": ["none", "full-context"],
@@ -276,7 +264,6 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
                         "experiment_id": "invalid-counterfactual",
                         "profiles": [str(VECTOR_NORTH), str(duplicate)],
                         "body_root": str(ROOT),
-                        "instance_command": [sys.executable, str(INSTANCE)],
                         "models": ["model-a"],
                         "reasoning_efforts": ["low"],
                         "identity_modes": ["none"],
@@ -320,7 +307,6 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
                         "experiment_id": "counterfactual-partial-rationale",
                         "profiles": profiles,
                         "body_root": str(ROOT),
-                        "instance_command": [sys.executable, str(INSTANCE)],
                         "models": ["model-a"],
                         "reasoning_efforts": ["low"],
                         "identity_modes": ["full-context"],

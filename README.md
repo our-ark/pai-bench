@@ -20,10 +20,10 @@ python3 -m pip install .
 ```
 
 The package exposes the `identity-benchmark` and
-`identity-benchmark-replay` commands. It also includes the optional
-`pai-bench-enoch-target` integration and a directly importable
-`CodexEvaluator`. The checkout-local launchers under `bin/` select Python 3.11
-or newer without requiring an installation.
+`identity-benchmark-replay` commands. It also includes directly importable
+`EnochAdapter` and `CodexEvaluator` implementations. The checkout-local
+launchers under `bin/` select Python 3.11 or newer without requiring an
+installation.
 
 ## Release layout
 
@@ -64,12 +64,12 @@ bin/identity-benchmark generate-vnext development/vnext --check
 
 ## Run a split
 
-The frozen manifests use a provider-neutral target placeholder and pin the
-Codex evaluator configuration. Copy the selected decoupled manifest to an
-untracked working directory and replace `instance_command` for the system
-being evaluated. Legacy frozen `evaluator.command` and `evaluator.harness`
-fields are accepted but ignored. Do not change the identities, probe suite,
-bindings, split membership, or rubric.
+The frozen manifests pin the target checkout in `body_root` and the Codex
+evaluator configuration. Copy the selected decoupled manifest to an untracked
+working directory and point `body_root` to Enoch. Legacy frozen
+`instance_command`, `evaluator.command`, and `evaluator.harness` fields are
+accepted but ignored. Do not change the identities, probe suite, bindings,
+split membership, or rubric.
 
 ```bash
 bin/identity-benchmark matrix \
@@ -81,16 +81,15 @@ bin/identity-benchmark matrix \
 Use the development split for pipeline work. Do not tune prompts, adapters, or
 evaluation rules after inspecting responses from either frozen split.
 
-## Adapter environment
+## Adapter configuration
 
-Target processes receive `IDENTITY_BENCHMARK_STATE_HOME`,
-`IDENTITY_BENCHMARK_MODEL`, `IDENTITY_BENCHMARK_REASONING_EFFORT`,
-`IDENTITY_BENCHMARK_IDENTITY_MODE`, and `IDENTITY_BENCHMARK_RUN_ID`.
-The runner constructs `CodexEvaluator` directly from the evaluator section of
-the experiment manifest.
+The runner constructs `EnochAdapter` directly from `body_root` and each matrix
+condition, and constructs `CodexEvaluator` directly from the evaluator section
+of the experiment manifest. Custom harnesses can inject another
+`AgentAdapter` factory without changing benchmark questions or scoring.
 
-In decoupled experiments, `{profile}` exposes only the identity contract to the
-target adapter. Questions and private scoring bindings stay runner-side. State
-transitions use a separate adapter control call after inference; see the
+In decoupled experiments, the adapter receives only the identity contract.
+Questions and private scoring bindings stay runner-side. State transitions use
+a separate adapter control call after inference; see the
 [protocol](docs/protocol.md). For the Enoch target and independent Codex judge,
 see [target and evaluator integrations](docs/integrations.md).

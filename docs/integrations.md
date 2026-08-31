@@ -4,33 +4,17 @@ PAI-Bench keeps three roles separate:
 
 | Role | Interface | Responsibility |
 | --- | --- | --- |
-| Benchmark core | `target_adapters.py` | Carries protocol requests to any target and validates protocol responses. |
-| Target integration | `integrations/enoch_target.py` | Installs an isolated identity and obtains an answer through an Enoch checkout. |
+| Benchmark core | `target_adapters.py` | Defines the `AgentAdapter` interface and per-condition configuration. |
+| Target implementation | `EnochAdapter` in `integrations/enoch_adapter.py` | Implements `AgentAdapter`, installs an isolated identity, and obtains an answer through Enoch. |
 | Evaluator implementation | `CodexEvaluator` in `codex_evaluator.py` | Implements the evaluator interface and scores the saved answer with an isolated Codex process. |
 
-`identity_benchmark.adapters` remains as a v1 compatibility import. New code
-should use `identity_benchmark.target_adapters`; it is target-side transport,
-not a model judge and not an Enoch-specific implementation.
+## EnochAdapter
 
-## Install the optional target command
-
-From the PAI-Bench checkout:
-
-```bash
-python3 -m pip install -e .
-pai-bench-enoch-target --help
-```
-
-The checkout-local launchers under `bin/` provide the same commands without an
-editable installation.
-
-## Enoch target
-
-`pai-bench-enoch-target` is an optional integration shipped by PAI-Bench. It
-does not add benchmark code to Enoch and does not make Enoch a dependency of
-the benchmark core. At run time it imports the public runtime from the Enoch
-checkout given by `--enoch-root` and calls Enoch's normal Codex completion
-path with the selected target model and reasoning effort.
+`EnochAdapter` directly implements `AgentAdapter`. It does not add benchmark
+code to Enoch and does not make Enoch a package dependency of the benchmark
+core. At run time it imports the public runtime from the Enoch checkout given
+by `body_root` and calls Enoch's normal Codex completion path with the selected
+target model and reasoning effort.
 
 For `installed` mode, the integration writes the portable Agent Identity once
 to the run's private `self.json`, locks that state directory to the profile,
@@ -43,8 +27,8 @@ rubrics stay runner-side.
 This installed-identity overlay is owned by the integration because the
 current Enoch runtime does not expose a native portable Agent Identity
 installation API. It is isolated under
-`IDENTITY_BENCHMARK_STATE_HOME`, separate from the user's Enoch memory and
-normal instance state. If Enoch later gains that API, this integration can
+the adapter's per-run `state_home`, separate from the user's Enoch memory and
+normal instance state. If Enoch later gains that API, this implementation can
 delegate installation to it without changing the benchmark protocol.
 
 The Enoch integration also supports vNext `attempt_transition` control calls.
@@ -81,18 +65,12 @@ cp releases/v1.0/data/dev-decoupled-experiment.json \
   releases/v1.0/data/dev-enoch-local.json
 ```
 
-In the working copy, set `body_root` to the absolute Enoch checkout and replace
-the target command. Configure the evaluator directly:
+In the working copy, set `body_root` to the absolute Enoch checkout and
+configure the evaluator directly:
 
 ```json
 {
   "body_root": "/absolute/path/to/enoch",
-  "instance_command": [
-    "pai-bench-enoch-target",
-    "--profile", "{profile}",
-    "--identity-mode", "{identity_mode}",
-    "--enoch-root", "{body_root}"
-  ],
   "evaluator": {
     "id": "codex-sol-xhigh-v2",
     "model": "gpt-5.6-sol",

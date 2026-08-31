@@ -10,7 +10,10 @@ import re
 from tempfile import TemporaryDirectory
 from typing import Any, Callable
 
-from identity_benchmark.target_adapters import CommandInstance
+from identity_benchmark.target_adapters import (
+    AgentAdapterConfig,
+    AgentFactory,
+)
 from identity_benchmark.contracts import (
     BenchmarkProfile,
     BenchmarkProfileError,
@@ -27,7 +30,9 @@ from identity_benchmark.runner import (
 )
 from identity_benchmark.codex_evaluator import CodexEvaluator
 from identity_benchmark.evaluators import Evaluator
+from identity_benchmark.integrations.enoch_adapter import EnochAdapter
 from identity_benchmark.probe_suites import (
+    IdentityProfile,
     ProbeSuiteError,
     compile_benchmark_profile,
     load_identity_profile,
@@ -62,7 +67,6 @@ class ExperimentSpec:
     experiment_id: str
     profile_paths: tuple[Path, ...]
     body_root: Path
-    instance_command: tuple[str, ...]
     models: tuple[str, ...]
     reasoning_efforts: tuple[str, ...]
     identity_modes: tuple[str, ...]
@@ -248,7 +252,6 @@ def parse_experiment_spec(value: object, *, base: Path) -> ExperimentSpec:
             "schema_version",
             "experiment_id",
             "body_root",
-            "instance_command",
             "models",
             "reasoning_efforts",
             "identity_modes",
@@ -264,6 +267,7 @@ def parse_experiment_spec(value: object, *, base: Path) -> ExperimentSpec:
             "population",
             "probe_suite",
             "probe_bindings",
+            "instance_command",
         },
     )
     if root["schema_version"] != EXPERIMENT_SCHEMA_VERSION:
@@ -274,10 +278,14 @@ def parse_experiment_spec(value: object, *, base: Path) -> ExperimentSpec:
         _text(root["$schema"], "$schema")
     profile_paths = _profile_paths(root, base)
     body_root = _path(root["body_root"], "body_root", base)
-    command = tuple(
-        _text(item, "instance_command[]")
-        for item in _nonempty_list(root["instance_command"], "instance_command")
-    )
+    if "instance_command" in root:
+        tuple(
+            _text(item, "instance_command[]")
+            for item in _nonempty_list(
+                root["instance_command"],
+                "instance_command",
+            )
+        )
     models = _unique_texts(root["models"], "models")
     reasoning_efforts = _unique_texts(root["reasoning_efforts"], "reasoning_efforts")
     identity_modes = _unique_texts(root["identity_modes"], "identity_modes")
@@ -310,7 +318,6 @@ def parse_experiment_spec(value: object, *, base: Path) -> ExperimentSpec:
         experiment_id=_identifier(root["experiment_id"], "experiment_id"),
         profile_paths=profile_paths,
         body_root=body_root,
-        instance_command=command,
         models=models,
         reasoning_efforts=reasoning_efforts,
         identity_modes=identity_modes,
@@ -494,8 +501,10 @@ def run_experiment(
     batch_size: int | None = None,
     batch_index: int = 1,
     resume: bool = False,
+    agent_factory: AgentFactory | None = None,
     evaluator_factory: EvaluatorFactory | None = None,
 ) -> ExperimentReport:
+    active_agent_factory = agent_factory or _enoch_agent
     active_evaluator_factory = evaluator_factory or _codex_evaluator
     if evaluator_factory is None and spec.evaluator is None:
         raise ExperimentError(
@@ -527,7 +536,6 @@ def run_experiment(
             run = _run_condition(
                 spec,
                 planned.profile,
-                profile_path=planned.profile_path,
                 run_id=planned.run_id,
                 state_home=state_home,
                 model=planned.model,
@@ -535,6 +543,7 @@ def run_experiment(
                 identity_mode=planned.identity_mode,
                 repetition=planned.repetition,
                 fingerprint=planned.fingerprint,
+                agent_factory=active_agent_factory,
                 evaluator_factory=active_evaluator_factory,
             )
             runs_by_id[planned.run_id] = run
@@ -755,7 +764,6 @@ def _run_fingerprint(
             "experiment_id": spec.experiment_id,
             "profile": profile.to_dict(),
             "body_root": str(spec.body_root),
-            "instance_command": list(spec.instance_command),
             "model": model,
             "reasoning_effort": reasoning_effort,
             "identity_mode": identity_mode,
@@ -899,39 +907,38 @@ def _run_condition(
     spec: ExperimentSpec,
     profile: BenchmarkProfile,
     *,
-    profile_path: Path,
     run_id: str,
     state_home: Path,
     model: str,
     reasoning_effort: str,
     identity_mode: str,
     repetition: int,
+    agent_factory: AgentFactory,
     evaluator_factory: EvaluatorFactory,
     fingerprint: str = "",
 ) -> ExperimentRun:
-    replacements = {
-        "body_root": str(spec.body_root),
-        "profile": str(profile_path),
-        "state_home": str(state_home),
-        "identity_mode": identity_mode,
-        "run_id": run_id,
-    }
-    command = tuple(_format_token(token, replacements) for token in spec.instance_command)
-    instance = CommandInstance(
-        command=command,
-        instance_id=(
-            f"{spec.experiment_id}:{profile.profile_id}:{model}:{reasoning_effort}:"
-            f"{identity_mode}:r{repetition:02d}"
+    identity_profile = IdentityProfile(
+        profile_id=profile.profile_id,
+        statements=tuple(
+            statement.to_dict() for statement in profile.statements
         ),
-        timeout_seconds=spec.timeout_seconds,
-        environment={
-            "IDENTITY_BENCHMARK_STATE_HOME": str(state_home),
-            "IDENTITY_BENCHMARK_MODEL": model,
-            "IDENTITY_BENCHMARK_REASONING_EFFORT": reasoning_effort,
-            "IDENTITY_BENCHMARK_IDENTITY_MODE": identity_mode,
-            "IDENTITY_BENCHMARK_RUN_ID": run_id,
-        },
-        cwd=spec.body_root,
+        agent_identity=profile.agent_identity,
+        description=profile.description,
+    )
+    instance = agent_factory(
+        AgentAdapterConfig(
+            instance_id=(
+                f"{spec.experiment_id}:{profile.profile_id}:{model}:"
+                f"{reasoning_effort}:{identity_mode}:r{repetition:02d}"
+            ),
+            profile=identity_profile,
+            agent_root=spec.body_root,
+            state_home=state_home,
+            model=model,
+            reasoning_effort=reasoning_effort,
+            identity_mode=identity_mode,
+            timeout_seconds=spec.timeout_seconds,
+        )
     )
     evaluator_state = state_home / "evaluator"
     evaluator_state.mkdir(mode=0o700)
@@ -1057,6 +1064,10 @@ def _codex_evaluator(
         timeout_seconds=spec.timeout_seconds,
         state_home=state_home,
     )
+
+
+def _enoch_agent(config: AgentAdapterConfig) -> EnochAdapter:
+    return EnochAdapter(config)
 
 
 def _population_groups(
@@ -1402,15 +1413,6 @@ def counterfactual_probe_ids(
                 "expectations."
             )
     return tuple(sorted(left_probes))
-
-
-def _format_token(token: str, replacements: dict[str, str]) -> str:
-    try:
-        return token.format_map(replacements)
-    except KeyError as error:
-        raise ExperimentError(
-            f"instance_command uses unknown placeholder {error.args[0]!r}."
-        ) from error
 
 
 def _write_json(path: Path, value: dict[str, JsonValue]) -> None:

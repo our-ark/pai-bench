@@ -20,7 +20,7 @@ from identity_benchmark.probe_suites import (
 )
 
 
-VNEXT_GENERATOR_VERSION = "pai-construct-vnext-dev.3"
+VNEXT_GENERATOR_VERSION = "pai-construct-vnext-dev.4"
 VNEXT_SUITE_ID = "pai-construct-vnext-dev.2"
 PROBES_PER_PROFILE = 25
 COMPOSITION_COMPONENTS = (
@@ -854,15 +854,6 @@ def _experiment_manifest(
             entry["profile_id"]: entry["bindings_path"] for entry in entries
         },
         "body_root": "../../../enoch",
-        "instance_command": [
-            "pai-bench-enoch-target",
-            "--profile",
-            "{profile}",
-            "--identity-mode",
-            "{identity_mode}",
-            "--enoch-root",
-            "{body_root}",
-        ],
         "models": ["gpt-5.6-luna"],
         "reasoning_efforts": ["medium"],
         "identity_modes": ["installed"],

@@ -22,7 +22,6 @@ from identity_benchmark.statistics import (
 )
 
 
-INSTANCE = FIXTURES / "synthetic-instance.py"
 VECTOR_NORTH = FIXTURES / "counterfactual" / "vector-north.json"
 VECTOR_SOUTH = VECTOR_NORTH.with_name("vector-south.json")
 
@@ -37,7 +36,6 @@ class IdentityBenchmarkStatisticsTests(unittest.TestCase):
                     "experiment_id": "bootstrap-fixture",
                     "profiles": [str(VECTOR_NORTH), str(VECTOR_SOUTH)],
                     "body_root": str(ROOT),
-                    "instance_command": [sys.executable, str(INSTANCE)],
                     "models": ["model-a", "model-b"],
                     "reasoning_efforts": ["low"],
                     "identity_modes": ["full-context"],

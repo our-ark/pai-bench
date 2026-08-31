@@ -6,14 +6,22 @@ from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 
-from identity_benchmark.target_adapters import CommandInstance, InstanceError
+from identity_benchmark.target_adapters import (
+    AgentAdapterConfig,
+    AgentAdapterError,
+)
 from identity_benchmark.codex_evaluator import CodexEvaluator
 from identity_benchmark.contracts import (
+    BenchmarkProfile,
     BenchmarkProfileError,
     BenchmarkReport,
     load_benchmark_profile,
 )
 from identity_benchmark.evaluators import EvaluatorError
+from identity_benchmark.integrations.enoch_adapter import (
+    EnochAdapter,
+    IDENTITY_MODES,
+)
 from identity_benchmark.experiments import (
     ExperimentError,
     format_experiment_plan,
@@ -39,18 +47,13 @@ from identity_benchmark.population import (
     PopulationError,
     write_population,
 )
+from identity_benchmark.probe_suites import IdentityProfile
 from identity_benchmark.vnext import VNextError, write_vnext
 
 
 def main(argv: list[str] | None = None) -> None:
-    raw_args = list(sys.argv[1:] if argv is None else argv)
-    instance_command: tuple[str, ...] = ()
-    if raw_args and raw_args[0] == "run" and "--" in raw_args:
-        separator = raw_args.index("--")
-        instance_command = tuple(raw_args[separator + 1 :])
-        raw_args = raw_args[:separator]
     parser = _parser()
-    args = parser.parse_args(raw_args)
+    args = parser.parse_args(argv)
     try:
         if args.action == "validate":
             profile = load_benchmark_profile(args.profile)
@@ -130,18 +133,27 @@ def main(argv: list[str] | None = None) -> None:
             print(f"{verb} vNext development suite: {len(paths)} files.")
             return
         profile = load_benchmark_profile(args.profile)
-        if not instance_command:
-            parser.error("run requires an instance command after '--'")
-        instance = CommandInstance(
-            command=instance_command,
-            instance_id=args.instance_id,
-            timeout_seconds=args.timeout,
-        )
         with TemporaryDirectory(prefix="pai-bench-run-") as state:
+            state_root = Path(state)
+            instance = EnochAdapter(
+                AgentAdapterConfig(
+                    instance_id=args.instance_id,
+                    profile=_identity_profile(profile),
+                    agent_root=args.enoch_root.expanduser().resolve(),
+                    state_home=state_root / "agent",
+                    model=args.model,
+                    reasoning_effort=args.reasoning_effort,
+                    identity_mode=args.identity_mode,
+                    timeout_seconds=args.timeout,
+                )
+            )
             report = run_benchmark(
                 profile,
                 instance,
-                evaluator=_codex_evaluator_from_args(args, Path(state)),
+                evaluator=_codex_evaluator_from_args(
+                    args,
+                    state_root / "evaluator",
+                ),
             )
         if args.json_out:
             _write_report(args.json_out, report)
@@ -152,7 +164,7 @@ def main(argv: list[str] | None = None) -> None:
         BenchmarkProfileError,
         ExperimentError,
         EvaluatorError,
-        InstanceError,
+        AgentAdapterError,
         PopulationError,
         RescoreError,
         StatisticalAnalysisError,
@@ -265,6 +277,14 @@ def _parser() -> argparse.ArgumentParser:
     run = subparsers.add_parser("run", help="run a profile against one target instance")
     run.add_argument("profile", type=Path)
     run.add_argument("--instance-id", required=True)
+    run.add_argument("--enoch-root", type=Path, required=True)
+    run.add_argument("--model", required=True)
+    run.add_argument("--reasoning-effort", default="medium")
+    run.add_argument(
+        "--identity-mode",
+        choices=sorted(IDENTITY_MODES),
+        default="installed",
+    )
     run.add_argument("--timeout", type=float, default=120.0)
     run.add_argument("--minimum-score", type=_unit_score)
     run.add_argument("--json-out", type=Path)
@@ -296,6 +316,17 @@ def _codex_evaluator_from_args(
         timeout_seconds=args.evaluator_timeout,
         codex_bin=args.codex_bin,
         state_home=state_home,
+    )
+
+
+def _identity_profile(profile: BenchmarkProfile) -> IdentityProfile:
+    return IdentityProfile(
+        profile_id=profile.profile_id,
+        statements=tuple(
+            statement.to_dict() for statement in profile.statements
+        ),
+        agent_identity=profile.agent_identity,
+        description=profile.description,
     )
 
 

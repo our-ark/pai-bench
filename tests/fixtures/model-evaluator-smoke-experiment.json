@@ -4,10 +4,6 @@
   "experiment_id": "model-evaluator-smoke-v1",
   "profile": "synthetic-profile.json",
   "body_root": "../..",
-  "instance_command": [
-    "python3",
-    "{body_root}/tests/fixtures/synthetic-instance.py"
-  ],
   "models": ["gpt-5.6-luna"],
   "reasoning_efforts": ["low"],
   "identity_modes": ["full-context"],
@@ -15,11 +11,6 @@
   "timeout_seconds": 600,
   "evaluator": {
     "id": "codex-sol-xhigh-v1",
-    "harness": "codex-cli",
-    "command": [
-      "python3",
-      "{body_root}/tests/fixtures/synthetic-evaluator.py"
-    ],
     "model": "gpt-5.6-sol",
     "reasoning_effort": "xhigh",
     "rubric_version": "pai-model-judge-v1",

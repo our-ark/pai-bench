@@ -36,10 +36,10 @@ The release also retains self-contained compiled profiles. They are immutable
 compatibility snapshots for reproducing the release compilation and are not
 the preferred authoring format.
 
-## Target adapter protocol
+## AgentAdapter interface
 
-An experiment launches a fresh target command for every probe and writes one
-JSON request to standard input:
+An experiment constructs one isolated `AgentAdapter` per atomic condition.
+For every probe the runner passes a typed request equivalent to:
 
 ```json
 {
@@ -50,7 +50,7 @@ JSON request to standard input:
 }
 ```
 
-The command returns exactly one JSON object:
+The adapter returns a typed response equivalent to:
 
 ```json
 {
@@ -60,23 +60,21 @@ The command returns exactly one JSON object:
 }
 ```
 
-Adapters receive the selected model, reasoning effort, isolated state path,
-identity mode, and run ID through `IDENTITY_BENCHMARK_*` environment
-variables. The interface can wrap a local process, HTTP endpoint, message
-transport, or another agent harness.
+Adapters receive an `AgentAdapterConfig` containing the public identity
+profile, selected model, reasoning effort, identity mode, agent root, and
+isolated state path. An implementation may connect to a local runtime, HTTP
+endpoint, message transport, or another agent harness.
 
-The provider-neutral command implementation lives in
-`identity_benchmark.target_adapters`. Optional target-specific implementations
-and independent evaluators are documented in
+The provider-neutral interface lives in `identity_benchmark.target_adapters`.
+Concrete target implementations and independent evaluators are documented in
 [target and evaluator integrations](integrations.md).
 
-The `{profile}` command placeholder always resolves to the identity-only input
-profile in decoupled experiments. Compiled probes, expectations, reference
-statements, and private bindings remain inside the benchmark runner and
-evaluator.
+The adapter receives an identity-only profile. Compiled probes, expectations,
+reference statements, and private bindings remain inside the benchmark runner
+and evaluator.
 
 If a probe prescribes an authorized state change, the runner first collects
-the target response and then invokes the same adapter with a separate control
+the response and then invokes the same adapter with a separate typed control
 request:
 
 ```json
@@ -92,8 +90,8 @@ request:
 }
 ```
 
-The adapter applies the transition without exposing it to the inference call
-and returns `{"protocol_version": 1, "applied": true}`. The ordinary response
+The adapter applies the transition without exposing it to the inference call;
+a successful `apply_transition` returns normally. The ordinary response
 request never contains transition or scoring data.
 
 ### Authorization-aware transition attempts
@@ -161,9 +159,10 @@ metrics, and capability controls remain excluded from the headline score.
 
 ## Experiment matrix
 
-An experiment manifest defines target models, reasoning efforts, identity
-modes, repetitions, the target command, timeouts, and Codex evaluator
-configuration.
+An experiment manifest defines the agent checkout, target models, reasoning
+efforts, identity modes, repetitions, timeouts, and Codex evaluator
+configuration. The bundled runner constructs `EnochAdapter` directly; another
+`AgentAdapter` can be supplied through the experiment API.
 
 ```bash
 bin/identity-benchmark matrix EXPERIMENT.json \

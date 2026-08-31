@@ -15,8 +15,7 @@ FIXTURES = ROOT / "tests" / "fixtures"
 from identity_benchmark import (
     AgentAdapter,
     CodexEvaluator,
-    CommandAgentAdapter,
-    CommandInstance,
+    EnochAdapter,
 )
 from identity_benchmark.contracts import BenchmarkRequest, InstanceResponse
 from identity_benchmark.evaluators import (
@@ -27,17 +26,21 @@ from identity_benchmark.evaluators import (
 from identity_benchmark.experiments import load_experiment_spec, run_experiment
 from identity_benchmark.runner import run_benchmark
 from identity_benchmark.contracts import load_benchmark_profile
-from evaluator_support import ExpectationTestEvaluator
+from evaluator_support import (
+    ExpectationTestEvaluator,
+    SyntheticAgent,
+    expectation_evaluator_factory,
+    synthetic_agent_factory,
+)
 
 
 PROFILE = FIXTURES / "synthetic-profile.json"
-AGENT = FIXTURES / "synthetic-instance.py"
 MODEL_EVALUATOR_MANIFEST = FIXTURES / "model-evaluator-smoke-experiment.json"
 
 
 class IdentityBenchmarkEvaluatorTests(unittest.TestCase):
-    def test_public_agent_adapter_names_preserve_v1_implementations(self) -> None:
-        self.assertIs(CommandAgentAdapter, CommandInstance)
+    def test_enoch_adapter_exposes_the_agent_contract(self) -> None:
+        self.assertTrue(hasattr(EnochAdapter, "respond"))
         self.assertTrue(hasattr(AgentAdapter, "respond"))
 
     def test_evaluation_result_rejects_non_finite_or_boolean_scores(self) -> None:
@@ -99,7 +102,6 @@ class IdentityBenchmarkEvaluatorTests(unittest.TestCase):
                         "experiment_id": "evaluator-fixture",
                         "profile": str(PROFILE),
                         "body_root": str(ROOT),
-                        "instance_command": [sys.executable, str(AGENT)],
                         "models": ["agent-model"],
                         "reasoning_efforts": ["low"],
                         "identity_modes": ["full-context"],
@@ -122,6 +124,7 @@ class IdentityBenchmarkEvaluatorTests(unittest.TestCase):
                 report = run_experiment(
                     load_experiment_spec(manifest),
                     temporary / "reports",
+                    agent_factory=synthetic_agent_factory,
                 )
             saved = json.loads(
                 (temporary / "reports" / "experiment-report.json").read_text(
@@ -139,6 +142,27 @@ class IdentityBenchmarkEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.aggregates[0]["evaluator_id"], "codex-judge-v1")
         self.assertEqual(saved["evaluator_ids"], ["codex-judge-v1"])
         self.assertFalse(state_home.exists())
+
+    def test_matrix_constructs_enoch_adapter_directly(self) -> None:
+        spec = load_experiment_spec(
+            FIXTURES / "local-smoke-experiment.json"
+        )
+        with TemporaryDirectory() as directory, patch(
+            "identity_benchmark.experiments.EnochAdapter",
+            side_effect=lambda config: SyntheticAgent(config),
+        ) as constructor:
+            report = run_experiment(
+                spec,
+                Path(directory) / "reports",
+                evaluator_factory=expectation_evaluator_factory,
+            )
+            config = constructor.call_args.args[0]
+
+        self.assertEqual(len(report.runs), 2)
+        self.assertEqual(config.agent_root, ROOT)
+        self.assertEqual(config.model, spec.models[-1])
+        self.assertEqual(config.reasoning_effort, spec.reasoning_efforts[-1])
+        self.assertFalse(hasattr(spec, "instance_command"))
 
 
 class _StaticAgent:

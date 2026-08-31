@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
-import time
 import unittest
 from unittest.mock import patch
 
@@ -16,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 FIXTURES = ROOT / "tests" / "fixtures"
 
-from identity_benchmark.target_adapters import CommandInstance, InstanceError
+from identity_benchmark.target_adapters import AgentAdapterError
 from identity_benchmark.cli import main
 from identity_benchmark.contracts import (
     BenchmarkProfileError,
@@ -33,11 +32,15 @@ from identity_benchmark.contracts import (
 )
 from identity_benchmark.rescore import RescoreError, rescore_saved_report
 from identity_benchmark.scoring import DeterministicScorer, weighted_expectation_score
-from evaluator_support import TEST_EVALUATOR, run_test_benchmark as run_benchmark
+from evaluator_support import (
+    SyntheticAgent,
+    TEST_EVALUATOR,
+    run_test_benchmark as run_benchmark,
+    synthetic_agent_for_profile,
+)
 
 
 PROFILE = FIXTURES / "synthetic-profile.json"
-INSTANCE = FIXTURES / "synthetic-instance.py"
 
 
 class IdentityBenchmarkTests(unittest.TestCase):
@@ -437,12 +440,11 @@ class IdentityBenchmarkTests(unittest.TestCase):
             instance.events[1][1]["operation"], "apply_transition"
         )
 
-    def test_command_instance_runs_every_probe_in_isolation(self) -> None:
+    def test_agent_adapter_runs_every_probe(self) -> None:
         profile = load_benchmark_profile(PROFILE)
-        instance = CommandInstance(
-            command=(sys.executable, str(INSTANCE)),
+        instance = synthetic_agent_for_profile(
+            profile,
             instance_id="synthetic-reference",
-            timeout_seconds=10,
         )
 
         report = run_benchmark(profile, instance)
@@ -463,35 +465,6 @@ class IdentityBenchmarkTests(unittest.TestCase):
         self.assertEqual(len(report.results), len(profile.probes))
         self.assertTrue(
             all(result.metadata.get("fixture") == "synthetic" for result in report.results)
-        )
-
-    @unittest.skipIf(sys.platform == "win32", "requires POSIX process groups")
-    def test_command_instance_timeout_terminates_descendants_and_is_recorded(
-        self,
-    ) -> None:
-        profile = load_benchmark_profile(PROFILE)
-        script = (
-            "import subprocess,sys,time;"
-            "subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)']);"
-            "time.sleep(30)"
-        )
-        instance = CommandInstance(
-            command=(sys.executable, "-c", script),
-            instance_id="hung-descendant",
-            timeout_seconds=0.05,
-        )
-
-        started = time.monotonic()
-        report = run_benchmark(profile, instance)
-        elapsed = time.monotonic() - started
-
-        self.assertLess(elapsed, 3.0)
-        self.assertEqual(report.errors, len(profile.probes))
-        self.assertTrue(
-            all(
-                result.error == "Instance command timed out after 0.05 seconds."
-                for result in report.results
-            )
         )
 
     def test_runner_records_an_instance_error_without_aborting_the_suite(self) -> None:
@@ -532,6 +505,9 @@ class IdentityBenchmarkTests(unittest.TestCase):
             with redirect_stdout(output), patch(
                 "identity_benchmark.cli.CodexEvaluator",
                 return_value=TEST_EVALUATOR,
+            ), patch(
+                "identity_benchmark.cli.EnochAdapter",
+                side_effect=lambda config: SyntheticAgent(config),
             ):
                 main(
                     [
@@ -539,13 +515,16 @@ class IdentityBenchmarkTests(unittest.TestCase):
                         str(PROFILE),
                         "--instance-id",
                         "synthetic-reference",
+                        "--enoch-root",
+                        str(ROOT),
+                        "--model",
+                        "synthetic-model",
+                        "--identity-mode",
+                        "full-context",
                         "--json-out",
                         str(report_path),
                         "--evaluator-model",
                         "judge-model",
-                        "--",
-                        sys.executable,
-                        str(INSTANCE),
                     ]
                 )
 
@@ -562,10 +541,9 @@ class IdentityBenchmarkTests(unittest.TestCase):
         profile = load_benchmark_profile(PROFILE)
         source = run_benchmark(
             profile,
-            CommandInstance(
-                command=(sys.executable, str(INSTANCE)),
+            synthetic_agent_for_profile(
+                profile,
                 instance_id="synthetic-source",
-                timeout_seconds=10,
             ),
         )
         with TemporaryDirectory() as directory:
@@ -675,7 +653,7 @@ class _FailingInstance:
 
     def respond(self, request: BenchmarkRequest) -> InstanceResponse:
         del request
-        raise InstanceError("instance unavailable")
+        raise AgentAdapterError("instance unavailable")
 
 
 class _ProbeResponseInstance:
@@ -749,7 +727,7 @@ class _FailingAttemptInstance:
 
     def respond(self, request: BenchmarkRequest) -> InstanceResponse:
         self.events.append(("respond", request.to_dict()))
-        raise InstanceError("inference unavailable")
+        raise AgentAdapterError("inference unavailable")
 
     def apply_transition(self, request: TransitionRequest) -> None:
         self.events.append(("apply_transition", request.to_dict()))
