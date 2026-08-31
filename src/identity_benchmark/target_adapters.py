@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Protocol
 
+from identity_benchmark.agent_identity import AgentIdentity
 from identity_benchmark.contracts import (
     BenchmarkRequest,
     InstanceResponse,
@@ -23,6 +24,10 @@ class AgentAdapter(Protocol):
 
     @property
     def instance_id(self) -> str: ...
+
+    def set_identity(self, identity: AgentIdentity) -> None:
+        """Install the instance's initial identity before inference."""
+        ...
 
     def respond(self, request: BenchmarkRequest) -> InstanceResponse: ...
 

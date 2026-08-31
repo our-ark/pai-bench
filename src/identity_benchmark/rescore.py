@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from identity_benchmark.agent_identity import AgentIdentity
 from identity_benchmark.contracts import (
     BenchmarkProfile,
     BenchmarkRequest,
@@ -26,6 +27,10 @@ class RescoreError(ValueError):
 class RecordedInstance:
     instance_id: str
     responses: dict[str, InstanceResponse]
+
+    def set_identity(self, identity: AgentIdentity) -> None:
+        # The saved responses already embody the original installed identity.
+        del identity
 
     def respond(self, request: BenchmarkRequest) -> InstanceResponse:
         try:

@@ -11,6 +11,11 @@ import sys
 import tempfile
 from typing import Callable, Iterator, Mapping
 
+from identity_benchmark.agent_identity import (
+    AgentIdentity,
+    AgentIdentityError,
+    parse_agent_identity,
+)
 from identity_benchmark.authorization import is_authorized
 from identity_benchmark.contracts import (
     BenchmarkRequest,
@@ -73,6 +78,16 @@ class EnochAdapter(
     @property
     def instance_id(self) -> str:
         return self.config.instance_id
+
+    def set_identity(self, identity: AgentIdentity) -> None:
+        try:
+            _install_identity(identity, self.config)
+        except EnochAdapterError:
+            raise
+        except Exception as error:
+            raise EnochAdapterError(
+                f"Enoch identity installation failed: {error}"
+            ) from error
 
     def respond(self, request: BenchmarkRequest) -> InstanceResponse:
         try:
@@ -137,7 +152,7 @@ def target_prompt(request: BenchmarkRequest, config: AgentAdapterConfig) -> str:
     _validate_request(request.profile_id, config)
     sections: list[str] = []
     if config.identity_mode == "installed":
-        document = _ensure_installed_identity(config)
+        document = _load_installed_identity(config)
         sections.extend(
             [
                 "# Personal Agent Identity",
@@ -237,9 +252,12 @@ def _apply_transition(
     _validate_request(request.profile_id, config)
     if config.identity_mode != "installed":
         raise EnochAdapterError("identity transitions require installed mode")
-    _ensure_installed_identity(config)
-    _validate_agent_identity(request.transition.agent_identity)
-    _atomic_json_write(_self_path(config), request.transition.agent_identity)
+    _load_installed_identity(config)
+    identity = _validated_agent_identity(
+        request.transition.agent_identity,
+        "transition Agent Identity",
+    )
+    _atomic_json_write(_self_path(config), identity)
 
 
 def _attempt_transition(
@@ -249,23 +267,26 @@ def _attempt_transition(
     _validate_request(request.profile_id, config)
     if config.identity_mode != "installed":
         raise EnochAdapterError("identity transition attempts require installed mode")
-    _ensure_installed_identity(config)
+    _load_installed_identity(config)
     accepted = is_authorized(request.profile_id, request.authorization)
     if accepted:
-        _validate_agent_identity(request.transition.agent_identity)
+        identity = _validated_agent_identity(
+            request.transition.agent_identity,
+            "transition Agent Identity",
+        )
         _atomic_json_write(
-            _self_path(config), request.transition.agent_identity
+            _self_path(config), identity
         )
     return accepted
 
 
-def _ensure_installed_identity(
+def _install_identity(
+    document: AgentIdentity,
     config: AgentAdapterConfig,
-) -> dict[str, JsonValue]:
-    document = config.profile.agent_identity
-    if document is None:
-        raise EnochAdapterError("installed mode requires profile.agent_identity")
-    _validate_agent_identity(document)
+) -> None:
+    if config.identity_mode != "installed":
+        raise EnochAdapterError("set_identity requires installed mode")
+    validated = _validated_agent_identity(document, "Agent Identity")
     config.state_home.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(config.state_home, 0o700)
     lock_path = config.state_home / _PROFILE_LOCK_FILENAME
@@ -276,14 +297,43 @@ def _ensure_installed_identity(
             raise EnochAdapterError(
                 "isolated benchmark state is locked to a different profile"
             )
-    elif self_path.exists():
+        if not self_path.exists():
+            raise EnochAdapterError("profile lock exists without self.json")
+        active = _validated_agent_identity(
+            _read_json(self_path, "installed self.json"),
+            "installed self.json",
+        )
+        if active != validated:
+            raise EnochAdapterError(
+                "identity is already set; use a governed transition to change it"
+            )
+        return
+    if self_path.exists():
         raise EnochAdapterError("self.json exists without a matching profile lock")
-    else:
-        _atomic_json_write(lock_path, {"profile_id": config.profile.profile_id})
-        _atomic_json_write(self_path, document)
-    active = _read_json(self_path, "installed self.json")
-    _validate_agent_identity(active)
-    return active
+    _atomic_json_write(lock_path, {"profile_id": config.profile.profile_id})
+    _atomic_json_write(self_path, validated)
+
+
+def _load_installed_identity(
+    config: AgentAdapterConfig,
+) -> dict[str, JsonValue]:
+    if config.identity_mode != "installed":
+        raise EnochAdapterError("installed identity requires installed mode")
+    lock_path = config.state_home / _PROFILE_LOCK_FILENAME
+    self_path = _self_path(config)
+    if not lock_path.exists() or not self_path.exists():
+        raise EnochAdapterError(
+            "installed identity is not initialized; call set_identity first"
+        )
+    lock = _read_json(lock_path, "profile lock")
+    if lock != {"profile_id": config.profile.profile_id}:
+        raise EnochAdapterError(
+            "isolated benchmark state is locked to a different profile"
+        )
+    return _validated_agent_identity(
+        _read_json(self_path, "installed self.json"),
+        "installed self.json",
+    )
 
 
 def _render_agent_identity(document: Mapping[str, JsonValue]) -> str:
@@ -315,27 +365,11 @@ def _validate_request(profile_id: str, config: AgentAdapterConfig) -> None:
         )
 
 
-def _validate_agent_identity(document: Mapping[str, JsonValue]) -> None:
-    required = {
-        "schema_version",
-        "identity",
-        "origin",
-        "mission",
-        "relationships",
-        "personality",
-        "values",
-        "care",
-    }
-    missing = sorted(required - set(document))
-    if missing:
-        raise EnochAdapterError(
-            "Agent Identity is missing required fields: " + ", ".join(missing)
-        )
-    if document.get("schema_version") != 1:
-        raise EnochAdapterError("Agent Identity schema_version must be 1")
-    identity = document.get("identity")
-    if not isinstance(identity, dict) or not isinstance(identity.get("id"), str):
-        raise EnochAdapterError("Agent Identity identity.id must be text")
+def _validated_agent_identity(value: object, label: str) -> AgentIdentity:
+    try:
+        return parse_agent_identity(value, label=label)
+    except AgentIdentityError as error:
+        raise EnochAdapterError(str(error)) from error
 
 
 def _validate_json_mapping(

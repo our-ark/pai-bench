@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from identity_benchmark.agent_identity import AgentIdentity
 from identity_benchmark.authorization import is_authorized
 from identity_benchmark.contracts import (
     BenchmarkProfile,
     BenchmarkRequest,
     InstanceResponse,
+    JsonValue,
     TransitionAttemptRequest,
     TransitionDecision,
     TransitionRequest,
@@ -99,6 +101,12 @@ class SyntheticAgent:
     def __init__(self, config: AgentAdapterConfig):
         self.config = config
         self.instance_id = config.instance_id
+        self.identity: dict[str, JsonValue] | None = None
+        self.identity_set_count = 0
+
+    def set_identity(self, identity: AgentIdentity) -> None:
+        self.identity = dict(identity)
+        self.identity_set_count += 1
 
     def respond(self, request: BenchmarkRequest) -> InstanceResponse:
         response = _synthetic_response(request, self.config)
@@ -106,6 +114,8 @@ class SyntheticAgent:
             response=response,
             metadata={
                 "fixture": "synthetic",
+                "identity_set": self.identity is not None,
+                "identity_set_count": self.identity_set_count,
                 "identity_mode": self.config.identity_mode,
                 "state_home": str(self.config.state_home),
                 "profile_keys": sorted(_keys(self.config.profile.to_dict())),

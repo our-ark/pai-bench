@@ -27,10 +27,10 @@ Each runnable case is compiled from:
 3. a private binding file containing variables, observable expectations, and
    authorized state transitions for that identity.
 
-The target receives only a probe's conversation messages. It never receives
-the reference statements, expected answer, evaluator rubric, or private
-binding. A target adapter may install the identity through its normal identity
-mechanism before answering.
+The target receives only the identity passed to `set_identity()` and a probe's
+conversation messages. It never receives the reference statements, expected
+answer, evaluator rubric, or private binding. A target adapter maps the
+explicit identity setup call to its normal identity mechanism before answering.
 
 The release also retains self-contained compiled profiles. They are immutable
 compatibility snapshots for reproducing the release compilation and are not
@@ -39,6 +39,18 @@ the preferred authoring format.
 ## AgentAdapter interface
 
 An experiment constructs one isolated `AgentAdapter` per atomic condition.
+For an `installed` condition, the runner first invokes the interface once with
+the identity-only document:
+
+```python
+adapter.set_identity(agent_identity: AgentIdentity)
+```
+
+This is initial setup, not an update channel. Changing an initialized identity
+uses the authorization-aware transition interface described below. The
+`AgentIdentity` document is validated against
+`specs/ai-agent-identity.schema.json` before installation; the same validator
+is used for profile loading, authorized updates, and rollback documents.
 For every probe the runner passes a typed request equivalent to:
 
 ```json

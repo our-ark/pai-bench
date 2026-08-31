@@ -5,7 +5,14 @@ import json
 import math
 from pathlib import Path
 import re
-from typing import Any, Literal, TypeAlias
+from typing import Any, Literal
+
+from identity_benchmark.agent_identity import (
+    AgentIdentity,
+    AgentIdentityError,
+    parse_agent_identity,
+)
+from identity_benchmark.json_types import JsonScalar, JsonValue
 
 
 SCHEMA_VERSION = 1
@@ -23,9 +30,6 @@ Dimension = Literal[
 ExpectationType = Literal["exact", "contains", "excludes", "regex"]
 ExpectationAspect = Literal["identity", "format", "constraint"]
 TransitionType = Literal["replace-agent-identity"]
-JsonScalar: TypeAlias = str | int | float | bool | None
-JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
-
 DIMENSIONS = {
     "recognition",
     "application",
@@ -91,7 +95,7 @@ class Expectation:
 @dataclass(frozen=True)
 class StateTransition:
     type: TransitionType
-    agent_identity: dict[str, JsonValue]
+    agent_identity: AgentIdentity
 
     def to_dict(self) -> dict[str, JsonValue]:
         return {
@@ -165,7 +169,7 @@ class BenchmarkProfile:
     profile_id: str
     statements: tuple[IdentityStatement, ...]
     probes: tuple[Probe, ...]
-    agent_identity: dict[str, JsonValue] | None = None
+    agent_identity: AgentIdentity | None = None
     description: str = ""
     schema_version: int = SCHEMA_VERSION
 
@@ -418,11 +422,7 @@ def parse_benchmark_profile(value: object) -> BenchmarkProfile:
     description = _optional_text(root.get("description"), "description")
     agent_identity = None
     if "agent_identity" in root:
-        identity = _mapping(root["agent_identity"], "agent_identity")
-        agent_identity = {
-            str(key): _json_value(item, f"agent_identity.{key}")
-            for key, item in identity.items()
-        }
+        agent_identity = _agent_identity(root["agent_identity"], "agent_identity")
     statements = tuple(
         _statement(item, index) for index, item in enumerate(_nonempty_list(root["statements"], "statements"))
     )
@@ -737,14 +737,20 @@ def _state_transition(value: object, label: str) -> StateTransition:
         raise BenchmarkProfileError(
             f"{label}.type must be one of: {', '.join(sorted(TRANSITION_TYPES))}."
         )
-    identity = _mapping(item["agent_identity"], f"{label}.agent_identity")
     return StateTransition(
         type=transition_type,  # type: ignore[arg-type]
-        agent_identity={
-            str(key): _json_value(item, f"{label}.agent_identity.{key}")
-            for key, item in identity.items()
-        },
+        agent_identity=_agent_identity(
+            item["agent_identity"],
+            f"{label}.agent_identity",
+        ),
     )
+
+
+def _agent_identity(value: object, label: str) -> AgentIdentity:
+    try:
+        return parse_agent_identity(value, label=label)
+    except AgentIdentityError as error:
+        raise BenchmarkProfileError(str(error)) from error
 
 
 def _authorization_envelope(

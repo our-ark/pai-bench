@@ -1039,6 +1039,12 @@ def _run_condition(
             timeout_seconds=spec.timeout_seconds,
         )
     )
+    if identity_mode == "installed":
+        if identity_profile.agent_identity is None:
+            raise ExperimentError(
+                f"installed run {run_id} requires profile.agent_identity"
+            )
+        instance.set_identity(identity_profile.agent_identity)
     evaluator_state = state_home / "evaluator"
     evaluator_state.mkdir(mode=0o700)
     evaluator = evaluator_factory(spec.evaluator, evaluator_state)

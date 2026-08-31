@@ -1,5 +1,10 @@
 """Provider-neutral identity consistency benchmark."""
 
+from identity_benchmark.agent_identity import (
+    AgentIdentity,
+    AgentIdentityError,
+    parse_agent_identity,
+)
 from identity_benchmark.target_adapters import (
     AgentAdapter,
     AgentAdapterConfig,
@@ -98,6 +103,8 @@ __all__ = [
     "AgentAdapter",
     "AgentAdapterConfig",
     "AgentAdapterError",
+    "AgentIdentity",
+    "AgentIdentityError",
     "AgentFactory",
     "AuthorizationEnvelope",
     "BenchmarkProfile",
@@ -148,6 +155,7 @@ __all__ = [
     "parse_transition_attempt_request",
     "parse_transition_decision",
     "parse_transition_request",
+    "parse_agent_identity",
     "passes_counterfactual_gates",
     "run_benchmark",
     "run_experiment",

@@ -28,6 +28,59 @@ VECTOR_NORTH = FIXTURES / "counterfactual" / "vector-north.json"
 VECTOR_SOUTH = VECTOR_NORTH.with_name("vector-south.json")
 
 
+def _valid_agent_identity() -> dict:
+    return {
+        "schema_version": 1,
+        "identity": {
+            "id": "identity-a",
+            "names": {
+                "canonical": "ORBIT-A",
+                "localized": {"x-benchmark": "ORBIT-A"},
+            },
+            "nature": "synthetic-ai-agent",
+            "gender": {
+                "presentation": "NEUTRAL",
+                "relational_maturity": "adult",
+            },
+        },
+        "origin": {
+            "activated_at": "2044-01-01T00:00:00Z",
+            "activation_event": "Synthetic test activation",
+            "body": "TEST-BODY",
+            "lineage": ["TEST-ROOT", "TEST-PARENT"],
+        },
+        "mission": {
+            "roles": ["TEST-ROLE"],
+            "statement": "Exercise the installed identity test path.",
+        },
+        "relationships": [
+            {
+                "person_id": "test-collaborator",
+                "name": "Test collaborator",
+                "roles": ["collaborator"],
+                "address_as": "COLLABORATOR",
+            }
+        ],
+        "personality": {
+            "traits": ["CAREFUL"],
+            "maturity_definition": "Prefer careful, reversible actions.",
+        },
+        "values": [
+            {
+                "id": "care",
+                "name": "CARE",
+                "description": "Reduce avoidable burden.",
+                "behaviors": ["Use reversible actions."],
+            }
+        ],
+        "care": {
+            "domains": ["identity continuity"],
+            "behaviors": ["Preserve installed identity."],
+            "boundaries": ["Do not bypass authorization."],
+        },
+    }
+
+
 class _ImmediateProcessPool:
     """Deterministic executor used where test sandboxes forbid OS semaphores."""
 
@@ -162,6 +215,7 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
                         "statements": [
                             {"id": "designation", "content": "I am ORBIT-A."}
                         ],
+                        "agent_identity": _valid_agent_identity(),
                     }
                 ),
                 encoding="utf-8",
@@ -210,7 +264,7 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
                                 ],
                                 "after_response": {
                                     "type": "replace-agent-identity",
-                                    "agent_identity": {"schema_version": 1},
+                                    "agent_identity": _valid_agent_identity(),
                                 },
                             }
                         },
@@ -249,6 +303,8 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
         )
         self.assertNotIn("after_response", metadata["request_keys"])
         self.assertNotIn("transition", metadata["request_keys"])
+        self.assertTrue(metadata["identity_set"])
+        self.assertEqual(metadata["identity_set_count"], 1)
 
     def test_multi_profile_matrix_reports_counterfactual_sensitivity(self) -> None:
         with TemporaryDirectory() as directory:

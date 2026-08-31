@@ -51,6 +51,7 @@ class EnochAdapterTests(unittest.TestCase):
                 ),
             )
 
+            _set_identity(adapter)
             result = adapter.respond(_request())
             installed = json.loads(
                 (adapter.config.state_home / "self.json").read_text(
@@ -72,6 +73,38 @@ class EnochAdapterTests(unittest.TestCase):
         self.assertNotIn("reference_statements", prompts[0])
         self.assertNotIn("pai-model-judge", prompts[0])
 
+    def test_installed_mode_requires_explicit_identity_setup(self) -> None:
+        with TemporaryDirectory() as directory:
+            adapter = EnochAdapter(
+                _config(Path(directory)),
+                completion=lambda _prompt, _config: EnochCompletion(
+                    response="unreachable",
+                    metadata={},
+                ),
+            )
+
+            with self.assertRaisesRegex(
+                EnochAdapterError,
+                "call set_identity first",
+            ):
+                adapter.respond(_request())
+
+    def test_set_identity_is_idempotent_but_cannot_bypass_governance(self) -> None:
+        with TemporaryDirectory() as directory:
+            adapter = EnochAdapter(_config(Path(directory)))
+            identity = adapter.config.profile.agent_identity
+            assert identity is not None
+            adapter.set_identity(identity)
+            adapter.set_identity(identity)
+            changed = deepcopy(identity)
+            changed["identity"]["names"]["canonical"] = "BYPASS"
+
+            with self.assertRaisesRegex(
+                EnochAdapterError,
+                "use a governed transition",
+            ):
+                adapter.set_identity(changed)
+
     def test_transition_is_applied_directly_after_response(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -83,6 +116,7 @@ class EnochAdapterTests(unittest.TestCase):
                 return EnochCompletion(response="before", metadata={})
 
             adapter = EnochAdapter(_config(root), completion=completion)
+            _set_identity(adapter)
             adapter.respond(_request())
             changed = deepcopy(adapter.config.profile.agent_identity)
             assert changed is not None
@@ -113,6 +147,7 @@ class EnochAdapterTests(unittest.TestCase):
                     metadata={},
                 ),
             )
+            _set_identity(adapter)
             adapter.respond(_request())
             changed = deepcopy(adapter.config.profile.agent_identity)
             assert changed is not None
@@ -160,6 +195,7 @@ class EnochAdapterTests(unittest.TestCase):
                     metadata={},
                 ),
             )
+            _set_identity(adapter)
             adapter.respond(_request())
             lock = adapter.config.state_home / "profile.json"
             lock.write_text(
@@ -183,6 +219,7 @@ class EnochAdapterTests(unittest.TestCase):
                     metadata={},
                 ),
             )
+            _set_identity(installed)
             installed.respond(_request())
             config = installed.config
             uninstalled = EnochAdapter(
@@ -225,6 +262,12 @@ def _request() -> BenchmarkRequest:
             Message(role="user", content="Return the stable designation."),
         ),
     )
+
+
+def _set_identity(adapter: EnochAdapter) -> None:
+    identity = adapter.config.profile.agent_identity
+    assert identity is not None
+    adapter.set_identity(identity)
 
 
 def _capture_completion(

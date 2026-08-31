@@ -7,6 +7,11 @@ from pathlib import Path
 import re
 from typing import Any
 
+from identity_benchmark.agent_identity import (
+    AgentIdentity,
+    AgentIdentityError,
+    parse_agent_identity,
+)
 from identity_benchmark.contracts import (
     BenchmarkProfile,
     JsonValue,
@@ -29,7 +34,7 @@ class ProbeSuiteError(ValueError):
 class IdentityProfile:
     profile_id: str
     statements: tuple[dict[str, JsonValue], ...]
-    agent_identity: dict[str, JsonValue] | None = None
+    agent_identity: AgentIdentity | None = None
     description: str = ""
     schema_version: int = SCHEMA_VERSION
 
@@ -106,9 +111,13 @@ def parse_identity_profile(value: object) -> IdentityProfile:
     _unique(statement_ids, "identity profile statement ids")
     agent_identity = None
     if "agent_identity" in root:
-        agent_identity = _json_mapping(
-            root["agent_identity"], "identity profile.agent_identity"
-        )
+        try:
+            agent_identity = parse_agent_identity(
+                root["agent_identity"],
+                label="identity profile.agent_identity",
+            )
+        except AgentIdentityError as error:
+            raise ProbeSuiteError(str(error)) from error
     return IdentityProfile(
         profile_id=profile_id,
         statements=tuple(statements),

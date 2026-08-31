@@ -41,6 +41,21 @@ from evaluator_support import (
 
 
 PROFILE = FIXTURES / "synthetic-profile.json"
+AGENT_IDENTITY_PROFILE = (
+    ROOT
+    / "releases"
+    / "v1.0"
+    / "data"
+    / "identities"
+    / "population-p002-a-publication-v4.json"
+)
+VALID_AGENT_IDENTITY = json.loads(
+    AGENT_IDENTITY_PROFILE.read_text(encoding="utf-8")
+)["agent_identity"]
+
+
+def _valid_agent_identity() -> dict:
+    return deepcopy(VALID_AGENT_IDENTITY)
 
 
 class IdentityBenchmarkTests(unittest.TestCase):
@@ -109,7 +124,7 @@ class IdentityBenchmarkTests(unittest.TestCase):
                     "messages": [{"role": "user", "content": "Answer."}],
                     "after_response": {
                         "type": "append-memory",
-                        "agent_identity": {"schema_version": 1},
+                        "agent_identity": _valid_agent_identity(),
                     },
                 }
             )
@@ -138,7 +153,7 @@ class IdentityBenchmarkTests(unittest.TestCase):
                 "probe_id": "probe-1",
                 "transition": {
                     "type": "replace-agent-identity",
-                    "agent_identity": {"schema_version": 1},
+                    "agent_identity": _valid_agent_identity(),
                 },
             }
         )
@@ -168,7 +183,7 @@ class IdentityBenchmarkTests(unittest.TestCase):
                         "before_response": {
                             "transition": {
                                 "type": "replace-agent-identity",
-                                "agent_identity": {"schema_version": 1},
+                                "agent_identity": _valid_agent_identity(),
                             },
                             "authorization": {
                                 "scheme": "test-capability-v1",
@@ -211,7 +226,7 @@ class IdentityBenchmarkTests(unittest.TestCase):
                     "before_response": {
                         "transition": {
                             "type": "replace-agent-identity",
-                            "agent_identity": {"schema_version": 1},
+                            "agent_identity": _valid_agent_identity(),
                         },
                         "authorization": {
                             "scheme": "test-capability-v1",
@@ -248,7 +263,7 @@ class IdentityBenchmarkTests(unittest.TestCase):
                         "before_response": {
                             "transition": {
                                 "type": "replace-agent-identity",
-                                "agent_identity": {"schema_version": 1},
+                                "agent_identity": _valid_agent_identity(),
                             },
                             "authorization": {
                                 "scheme": "test-capability-v1",
@@ -259,7 +274,7 @@ class IdentityBenchmarkTests(unittest.TestCase):
                         },
                         "after_response": {
                             "type": "replace-agent-identity",
-                            "agent_identity": {"schema_version": 1},
+                            "agent_identity": _valid_agent_identity(),
                         },
                     }
                 ],
@@ -411,7 +426,7 @@ class IdentityBenchmarkTests(unittest.TestCase):
                         ],
                         "after_response": {
                             "type": "replace-agent-identity",
-                            "agent_identity": {"schema_version": 1},
+                            "agent_identity": _valid_agent_identity(),
                         },
                     },
                     {
@@ -586,7 +601,7 @@ class IdentityBenchmarkTests(unittest.TestCase):
                         "before_response": {
                             "transition": {
                                 "type": "replace-agent-identity",
-                                "agent_identity": {"schema_version": 1},
+                                "agent_identity": _valid_agent_identity(),
                             },
                             "authorization": {
                                 "scheme": "test-capability-v1",

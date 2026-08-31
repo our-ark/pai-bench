@@ -83,7 +83,11 @@ bin/identity-benchmark matrix \
 processes and isolated state directories. Probes within one condition remain
 ordered so governed updates and rollbacks preserve their intended state.
 Completed conditions are written atomically by the parent process and remain
-resumable after interruption.
+resumable after interruption. For an `installed` condition, the runner calls
+the target adapter's `set_identity()` once before the first probe; later
+identity changes use the separate governed transition interface. Initial and
+transition identities share the strict portable schema in
+`specs/ai-agent-identity.schema.json`.
 
 Use the development split for pipeline work. Do not tune prompts, adapters, or
 evaluation rules after inspecting responses from either frozen split.

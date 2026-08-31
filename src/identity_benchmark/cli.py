@@ -148,6 +148,13 @@ def main(argv: list[str] | None = None) -> None:
                     timeout_seconds=args.timeout,
                 )
             )
+            if args.identity_mode == "installed":
+                identity = instance.config.profile.agent_identity
+                if identity is None:
+                    raise AgentAdapterError(
+                        "installed mode requires profile.agent_identity"
+                    )
+                instance.set_identity(identity)
             report = run_benchmark(
                 profile,
                 instance,
