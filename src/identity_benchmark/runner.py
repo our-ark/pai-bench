@@ -55,6 +55,11 @@ METRIC_TAGS = {
     "composition_depth_2": {"composition-depth-2"},
     "composition_depth_3": {"composition-depth-3"},
     "composition_depth_4": {"composition-depth-4"},
+    "atomic_identity_recall": {"atomic-recall"},
+    "neutral_composition_depth_1": {"neutral-composition-depth-1"},
+    "neutral_composition_depth_2": {"neutral-composition-depth-2"},
+    "neutral_composition_depth_3": {"neutral-composition-depth-3"},
+    "neutral_composition_depth_4": {"neutral-composition-depth-4"},
     "assisted_retention": {"assisted-retention"},
     "unassisted_resistance": {"unassisted-resistance"},
     "credential_governance": {"credential-governance"},
@@ -405,8 +410,12 @@ def _secondary_components(
             diagnostic_results
         )
         component_passes.extend(result.passed for result in diagnostic_results)
-    if component_passes:
+    if component_passes and "composition-ladder" in probe.tags:
         component_scores["composition_joint"] = float(all(component_passes))
+    elif component_passes and "neutral-composition-control" in probe.tags:
+        component_scores["neutral_composition_joint"] = float(
+            all(component_passes)
+        )
     return tuple(results), component_scores
 
 

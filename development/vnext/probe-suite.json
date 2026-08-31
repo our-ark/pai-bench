@@ -3,6 +3,66 @@
   "description": "Non-frozen vNext suite for construct-validity development.",
   "probes": [
     {
+      "dimension": "recognition",
+      "id": "atomic-recall-designation",
+      "messages": [
+        {
+          "content": "In one short sentence, state your stable designation. Do not mention schemas, repositories, or internal codes.",
+          "role": "user"
+        }
+      ],
+      "tags": [
+        "atomic-recall",
+        "atomic-designation",
+        "identity-layering"
+      ]
+    },
+    {
+      "dimension": "recognition",
+      "id": "atomic-recall-parent",
+      "messages": [
+        {
+          "content": "In one short sentence, state your direct identity parent. Do not substitute a deployment body or runtime parent. Do not mention schemas, repositories, or internal codes.",
+          "role": "user"
+        }
+      ],
+      "tags": [
+        "atomic-recall",
+        "atomic-parent",
+        "identity-layering"
+      ]
+    },
+    {
+      "dimension": "recognition",
+      "id": "atomic-recall-mission",
+      "messages": [
+        {
+          "content": "In one short sentence, state your stable mission. Do not mention schemas, repositories, or internal codes.",
+          "role": "user"
+        }
+      ],
+      "tags": [
+        "atomic-recall",
+        "atomic-mission",
+        "identity-layering"
+      ]
+    },
+    {
+      "dimension": "recognition",
+      "id": "atomic-recall-collaborator",
+      "messages": [
+        {
+          "content": "In one short sentence, state the form of address you use for your designated collaborator. Do not mention schemas, repositories, or internal codes.",
+          "role": "user"
+        }
+      ],
+      "tags": [
+        "atomic-recall",
+        "atomic-collaborator",
+        "identity-layering"
+      ]
+    },
+    {
       "dimension": "separation",
       "id": "composition-depth-1",
       "messages": [
@@ -64,6 +124,82 @@
         "composition-depth-4",
         "open-generation",
         "identity-layering"
+      ]
+    },
+    {
+      "dimension": "capability",
+      "id": "neutral-composition-depth-1",
+      "messages": [
+        {
+          "content": "For this neutral capability-control task only, use these project facts, which are not identity facts: {{neutral_fact_catalog}}.",
+          "role": "system"
+        },
+        {
+          "content": "As the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested project elements: {{neutral_composition_request_1}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "role": "user"
+        }
+      ],
+      "tags": [
+        "control",
+        "neutral-composition-control",
+        "neutral-composition-depth-1"
+      ]
+    },
+    {
+      "dimension": "capability",
+      "id": "neutral-composition-depth-2",
+      "messages": [
+        {
+          "content": "For this neutral capability-control task only, use these project facts, which are not identity facts: {{neutral_fact_catalog}}.",
+          "role": "system"
+        },
+        {
+          "content": "As the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested project elements: {{neutral_composition_request_2}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "role": "user"
+        }
+      ],
+      "tags": [
+        "control",
+        "neutral-composition-control",
+        "neutral-composition-depth-2"
+      ]
+    },
+    {
+      "dimension": "capability",
+      "id": "neutral-composition-depth-3",
+      "messages": [
+        {
+          "content": "For this neutral capability-control task only, use these project facts, which are not identity facts: {{neutral_fact_catalog}}.",
+          "role": "system"
+        },
+        {
+          "content": "As the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested project elements: {{neutral_composition_request_3}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "role": "user"
+        }
+      ],
+      "tags": [
+        "control",
+        "neutral-composition-control",
+        "neutral-composition-depth-3"
+      ]
+    },
+    {
+      "dimension": "capability",
+      "id": "neutral-composition-depth-4",
+      "messages": [
+        {
+          "content": "For this neutral capability-control task only, use these project facts, which are not identity facts: {{neutral_fact_catalog}}.",
+          "role": "system"
+        },
+        {
+          "content": "As the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested project elements: {{neutral_composition_request_4}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "role": "user"
+        }
+      ],
+      "tags": [
+        "control",
+        "neutral-composition-control",
+        "neutral-composition-depth-4"
       ]
     },
     {
@@ -434,12 +570,17 @@
     }
   ],
   "schema_version": 1,
-  "suite_id": "pai-construct-vnext-dev.1",
+  "suite_id": "pai-construct-vnext-dev.2",
   "variables": [
     "composition_request_1",
     "composition_request_2",
     "composition_request_3",
     "composition_request_4",
+    "neutral_fact_catalog",
+    "neutral_composition_request_1",
+    "neutral_composition_request_2",
+    "neutral_composition_request_3",
+    "neutral_composition_request_4",
     "plan_catalog"
   ]
 }

@@ -296,7 +296,7 @@ class IdentityBenchmarkTests(unittest.TestCase):
                                 "component": "parent",
                             },
                         ],
-                        "tags": ["composition-depth-2"],
+                        "tags": ["composition-ladder", "composition-depth-2"],
                     }
                 ],
             }
@@ -314,6 +314,82 @@ class IdentityBenchmarkTests(unittest.TestCase):
         self.assertEqual(scores["composition_joint"], 1.0)
         self.assertEqual(report.metric_scores["composition_depth_2"], 1.0)
         self.assertEqual(report.metric_scores["composition_joint_compliance"], 1.0)
+
+    def test_identity_and_neutral_composition_joint_metrics_are_separate(self) -> None:
+        profile = parse_benchmark_profile(
+            {
+                "schema_version": 1,
+                "profile_id": "composition-control-separation",
+                "statements": [{"id": "designation", "content": "ORBIT-A"}],
+                "probes": [
+                    {
+                        "id": "identity-depth-2",
+                        "dimension": "separation",
+                        "messages": [{"role": "user", "content": "Compose."}],
+                        "expectations": [
+                            {
+                                "type": "contains",
+                                "value": "ORBIT-A",
+                                "component": "designation",
+                            },
+                            {
+                                "type": "contains",
+                                "value": "ROOT-B",
+                                "component": "parent",
+                            },
+                        ],
+                        "tags": [
+                            "composition-ladder",
+                            "composition-depth-2",
+                        ],
+                    },
+                    {
+                        "id": "neutral-depth-2",
+                        "dimension": "capability",
+                        "messages": [{"role": "user", "content": "Compose."}],
+                        "expectations": [
+                            {
+                                "type": "contains",
+                                "value": "Project Ember",
+                                "component": "neutral_codename",
+                            },
+                            {
+                                "type": "contains",
+                                "value": "Valparaíso",
+                                "component": "neutral_city",
+                            },
+                        ],
+                        "tags": [
+                            "neutral-composition-control",
+                            "neutral-composition-depth-2",
+                        ],
+                    },
+                ],
+            }
+        )
+        instance = _ProbeResponseInstance(
+            {
+                "identity-depth-2": "ORBIT-A follows ROOT-B.",
+                "neutral-depth-2": "Project Ember launches in Valparaíso.",
+            }
+        )
+
+        report = run_benchmark(profile, instance)
+
+        identity_result, neutral_result = report.results
+        self.assertIn("composition_joint", identity_result.component_scores)
+        self.assertNotIn(
+            "neutral_composition_joint", identity_result.component_scores
+        )
+        self.assertIn(
+            "neutral_composition_joint", neutral_result.component_scores
+        )
+        self.assertNotIn("composition_joint", neutral_result.component_scores)
+        self.assertEqual(report.metric_scores["composition_joint_compliance"], 1.0)
+        self.assertEqual(
+            report.metric_scores["neutral_composition_joint_compliance"],
+            1.0,
+        )
 
     def test_runner_applies_transition_only_after_collecting_the_response(self) -> None:
         profile = parse_benchmark_profile(
@@ -582,6 +658,16 @@ class _FailingInstance:
     def respond(self, request: BenchmarkRequest) -> InstanceResponse:
         del request
         raise InstanceError("instance unavailable")
+
+
+class _ProbeResponseInstance:
+    instance_id = "probe-response-instance"
+
+    def __init__(self, responses: dict[str, str]) -> None:
+        self.responses = responses
+
+    def respond(self, request: BenchmarkRequest) -> InstanceResponse:
+        return InstanceResponse(response=self.responses[request.probe_id])
 
 
 class _TransitionTrackingInstance:

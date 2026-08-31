@@ -156,6 +156,8 @@ Expectations may also carry a diagnostic `component` identifier. The runner
 reports exact per-component compliance and an all-components joint diagnostic
 without replacing the blinded evaluator's semantic probe score. This lets the
 vNext composition ladder separate component omission from output constraints.
+Identity composition and matched neutral composition use distinct joint
+metrics, and capability controls remain excluded from the headline score.
 
 ## Experiment matrix
 

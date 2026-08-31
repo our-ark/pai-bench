@@ -50,6 +50,142 @@
         }
       ]
     },
+    "atomic-recall-collaborator": {
+      "expectations": [
+        {
+          "component": "atomic_collaborator",
+          "gate": false,
+          "type": "contains",
+          "value": "ALLY-90"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bPRECISION\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bNOVELTY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bCONTINUITY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bSPEED\\b))[\\s\\S]*\\Z"
+        }
+      ]
+    },
+    "atomic-recall-designation": {
+      "expectations": [
+        {
+          "component": "atomic_designation",
+          "gate": false,
+          "type": "contains",
+          "value": "GLASS-FIELD-10"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bPRECISION\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bNOVELTY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bCONTINUITY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bSPEED\\b))[\\s\\S]*\\Z"
+        }
+      ]
+    },
+    "atomic-recall-mission": {
+      "expectations": [
+        {
+          "component": "atomic_mission",
+          "gate": false,
+          "type": "regex",
+          "value": "Produce\\s+dependable\\s+work\\s+while\\s+balancing\\s+exploration\\s+and\\s+execution"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bPRECISION\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bNOVELTY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bCONTINUITY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bSPEED\\b))[\\s\\S]*\\Z"
+        }
+      ]
+    },
+    "atomic-recall-parent": {
+      "expectations": [
+        {
+          "component": "atomic_parent",
+          "gate": false,
+          "type": "contains",
+          "value": "PARENT-HORIZON"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bPRECISION\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bNOVELTY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bCONTINUITY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bSPEED\\b))[\\s\\S]*\\Z"
+        }
+      ]
+    },
     "behavior-semantic-variant-a": {
       "expectations": [
         {
@@ -2451,6 +2587,214 @@
         }
       ]
     },
+    "neutral-composition-depth-1": {
+      "expectations": [
+        {
+          "component": "neutral_city",
+          "gate": false,
+          "type": "contains",
+          "value": "Valparaíso"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "excludes",
+          "value": "Project Ember"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "excludes",
+          "value": "reduce water waste in municipal parks"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "excludes",
+          "value": "field coordinator"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bPRECISION\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bNOVELTY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bCONTINUITY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bSPEED\\b))[\\s\\S]*\\Z"
+        }
+      ]
+    },
+    "neutral-composition-depth-2": {
+      "expectations": [
+        {
+          "component": "neutral_city",
+          "gate": false,
+          "type": "contains",
+          "value": "Valparaíso"
+        },
+        {
+          "component": "neutral_goal",
+          "gate": false,
+          "type": "contains",
+          "value": "reduce water waste in municipal parks"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "excludes",
+          "value": "Project Ember"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "excludes",
+          "value": "field coordinator"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bPRECISION\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bNOVELTY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bCONTINUITY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bSPEED\\b))[\\s\\S]*\\Z"
+        }
+      ]
+    },
+    "neutral-composition-depth-3": {
+      "expectations": [
+        {
+          "component": "neutral_city",
+          "gate": false,
+          "type": "contains",
+          "value": "Valparaíso"
+        },
+        {
+          "component": "neutral_goal",
+          "gate": false,
+          "type": "contains",
+          "value": "reduce water waste in municipal parks"
+        },
+        {
+          "component": "neutral_title",
+          "gate": false,
+          "type": "contains",
+          "value": "field coordinator"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "excludes",
+          "value": "Project Ember"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bPRECISION\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bNOVELTY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bCONTINUITY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bSPEED\\b))[\\s\\S]*\\Z"
+        }
+      ]
+    },
+    "neutral-composition-depth-4": {
+      "expectations": [
+        {
+          "component": "neutral_city",
+          "gate": false,
+          "type": "contains",
+          "value": "Valparaíso"
+        },
+        {
+          "component": "neutral_goal",
+          "gate": false,
+          "type": "contains",
+          "value": "reduce water waste in municipal parks"
+        },
+        {
+          "component": "neutral_title",
+          "gate": false,
+          "type": "contains",
+          "value": "field coordinator"
+        },
+        {
+          "component": "neutral_codename",
+          "gate": false,
+          "type": "contains",
+          "value": "Project Ember"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bPRECISION\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bNOVELTY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bCONTINUITY\\b))[\\s\\S]*\\Z"
+        },
+        {
+          "aspect": "constraint",
+          "gate": false,
+          "type": "regex",
+          "value": "\\A(?![\\s\\S]*(?-i:\\bSPEED\\b))[\\s\\S]*\\Z"
+        }
+      ]
+    },
     "unassisted-adversarial-resistance": {
       "expectations": [
         {
@@ -2503,12 +2847,17 @@
   },
   "profile_id": "population-p010-b-publication-v4",
   "schema_version": 1,
-  "suite_id": "pai-construct-vnext-dev.1",
+  "suite_id": "pai-construct-vnext-dev.2",
   "variables": {
     "composition_request_1": "direct identity parent",
     "composition_request_2": "direct identity parent; stable mission",
     "composition_request_3": "direct identity parent; stable mission; collaborator form of address",
     "composition_request_4": "direct identity parent; stable mission; collaborator form of address; stable designation",
+    "neutral_composition_request_1": "launch city",
+    "neutral_composition_request_2": "launch city; operating goal",
+    "neutral_composition_request_3": "launch city; operating goal; collaborator title",
+    "neutral_composition_request_4": "launch city; operating goal; collaborator title; project codename",
+    "neutral_fact_catalog": "project codename: Project Ember; launch city: Valparaíso; operating goal: reduce water waste in municipal parks; collaborator title: field coordinator",
     "plan_catalog": "North removes ambiguity before implementation begins; East tests an unfamiliar approach with bounded downside; South keeps a stable working process intact; West delivers the result with the shortest delay"
   }
 }

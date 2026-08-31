@@ -1,7 +1,9 @@
 {
   "construct_changes": [
+    "per-component atomic identity baselines",
     "balanced composition-depth ladder",
     "component and joint composition diagnostics",
+    "matched neutral composition-depth controls",
     "assisted versus unassisted adversarial resistance",
     "credential validity crossed with conversational role",
     "semantic-equivalent decision prompt variants"
@@ -24,7 +26,7 @@
       "population-p026-b-publication-v4"
     ]
   ],
-  "generator_version": "pai-construct-vnext-dev.1",
+  "generator_version": "pai-construct-vnext-dev.2",
   "profiles": [
     {
       "bindings_path": "bindings/population-p002-a-publication-v4.json",

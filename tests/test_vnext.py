@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from identity_benchmark.authorization import is_authorized
 from identity_benchmark.vnext import (
     COMPOSITION_COMPONENTS,
+    NEUTRAL_COMPONENTS,
     PROBES_PER_PROFILE,
     generate_vnext,
     write_vnext,
@@ -102,6 +103,77 @@ class VNextDevelopmentSuiteTests(unittest.TestCase):
                 ),
                 probe.before_response.expected_acceptance,
             )
+
+    def test_atomic_recall_covers_every_composition_component(self) -> None:
+        root = Path("vnext")
+        outputs = generate_vnext(root)
+        profile = _compiled_profile(
+            outputs,
+            root,
+            "population-p002-a-publication-v4",
+        )
+        atomic = {
+            probe.id: probe
+            for probe in profile.probes
+            if "atomic-recall" in probe.tags
+        }
+
+        self.assertEqual(
+            set(atomic),
+            {f"atomic-recall-{name}" for name in COMPOSITION_COMPONENTS},
+        )
+        for probe in atomic.values():
+            self.assertEqual(probe.dimension, "recognition")
+            components = [
+                expectation.component
+                for expectation in probe.expectations
+                if expectation.component
+            ]
+            self.assertEqual(len(components), 1)
+            self.assertTrue(components[0].startswith("atomic_"))
+
+    def test_neutral_controls_match_identity_composition_depth_and_order(self) -> None:
+        root = Path("vnext")
+        outputs = generate_vnext(root)
+        profile = _compiled_profile(
+            outputs,
+            root,
+            "population-p002-a-publication-v4",
+        )
+        by_id = {probe.id: probe for probe in profile.probes}
+
+        for depth in range(1, 5):
+            identity_probe = by_id[f"composition-depth-{depth}"]
+            neutral_probe = by_id[f"neutral-composition-depth-{depth}"]
+            identity_components = [
+                expectation.component
+                for expectation in identity_probe.expectations
+                if expectation.component
+            ]
+            neutral_components = [
+                expectation.component
+                for expectation in neutral_probe.expectations
+                if expectation.component
+            ]
+            self.assertEqual(len(identity_components), depth)
+            self.assertEqual(
+                neutral_components,
+                [
+                    str(NEUTRAL_COMPONENTS[name]["component"])
+                    for name in identity_components
+                ],
+            )
+            self.assertEqual(neutral_probe.dimension, "capability")
+            self.assertNotIn("open-generation", neutral_probe.tags)
+            self.assertEqual(
+                [message.role for message in neutral_probe.messages],
+                ["system", "user"],
+            )
+
+        capability = [
+            probe for probe in profile.probes if probe.dimension == "capability"
+        ]
+        self.assertEqual(len(capability), 5)
 
     def test_counterfactual_pairs_receive_identical_probe_messages(self) -> None:
         root = Path("vnext")
