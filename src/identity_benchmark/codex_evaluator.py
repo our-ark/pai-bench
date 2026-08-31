@@ -22,6 +22,7 @@ IMPLEMENTATION_ID = "codex-evaluator-v2"
 ALLOWED_SCORES = (0.0, 0.25, 0.5, 0.75, 1.0)
 RUBRIC_VERSIONS = ("pai-model-judge-v1", "pai-model-judge-v2")
 DEFAULT_TIMEOUT_SECONDS = 600.0
+DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_CODEX_PATHS = (
     "/Applications/ChatGPT.app/Contents/Resources/codex",
     "/Applications/Codex.app/Contents/Resources/codex",
@@ -43,6 +44,7 @@ class CodexEvaluator:
     state_home: Path
     rubric_version: str = "pai-model-judge-v2"
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
+    max_attempts: int = DEFAULT_MAX_ATTEMPTS
     codex_bin: str = ""
 
     def __post_init__(self) -> None:
@@ -58,6 +60,12 @@ class CodexEvaluator:
             )
         if self.timeout_seconds <= 0:
             raise CodexEvaluatorError("evaluator timeout must be positive")
+        if (
+            isinstance(self.max_attempts, bool)
+            or not isinstance(self.max_attempts, int)
+            or self.max_attempts <= 0
+        ):
+            raise CodexEvaluatorError("evaluator max_attempts must be a positive integer")
 
     def evaluate(self, request: EvaluationRequest) -> EvaluationResult:
         executable, executable_source = resolve_codex_executable(self.codex_bin)
@@ -68,6 +76,45 @@ class CodexEvaluator:
             request,
             rubric_version=self.rubric_version,
         )
+        last_error: CodexEvaluatorError | None = None
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                score, usage = self._evaluate_once(
+                    executable,
+                    state_home,
+                    prompt,
+                )
+            except CodexEvaluatorError as error:
+                last_error = error
+                if attempt < self.max_attempts:
+                    continue
+                plural = "attempt" if attempt == 1 else "attempts"
+                raise CodexEvaluatorError(
+                    f"Codex evaluator failed after {attempt} {plural}: {error}"
+                ) from error
+            return EvaluationResult(
+                score=score,
+                metadata={
+                    "implementation": IMPLEMENTATION_ID,
+                    "evaluator_id": self.evaluator_id,
+                    "harness": "codex-cli",
+                    "model": self.model,
+                    "reasoning_effort": self.reasoning_effort,
+                    "rubric_version": self.rubric_version,
+                    "codex_executable_source": executable_source,
+                    "attempts": attempt,
+                    **usage,
+                },
+            )
+        assert last_error is not None
+        raise last_error
+
+    def _evaluate_once(
+        self,
+        executable: str,
+        state_home: Path,
+        prompt: str,
+    ) -> tuple[float, dict[str, int]]:
         with tempfile.TemporaryDirectory(
             prefix="codex-evaluator-",
             dir=state_home,
@@ -121,11 +168,7 @@ class CodexEvaluator:
                     f"Codex evaluator failed: {error}"
                 ) from error
             if completed.returncode != 0:
-                detail = (
-                    completed.stderr.strip()
-                    or completed.stdout.strip()
-                    or "no output"
-                )
+                detail = _failure_detail(completed)
                 raise CodexEvaluatorError(
                     "Codex evaluator exited with "
                     f"{completed.returncode}: {_clip(detail)}"
@@ -136,19 +179,7 @@ class CodexEvaluator:
                 )
             score = _parse_score(output_path)
             usage = _usage_from_jsonl(completed.stdout)
-        return EvaluationResult(
-            score=score,
-            metadata={
-                "implementation": IMPLEMENTATION_ID,
-                "evaluator_id": self.evaluator_id,
-                "harness": "codex-cli",
-                "model": self.model,
-                "reasoning_effort": self.reasoning_effort,
-                "rubric_version": self.rubric_version,
-                "codex_executable_source": executable_source,
-                **usage,
-            },
-        )
+        return score, usage
 
 
 def evaluator_prompt(
@@ -311,3 +342,12 @@ def _score_schema() -> dict[str, Any]:
 
 def _clip(value: str, limit: int = 1000) -> str:
     return value if len(value) <= limit else value[:limit].rstrip() + "…"
+
+
+def _failure_detail(completed: subprocess.CompletedProcess[str]) -> str:
+    parts = []
+    if completed.stderr.strip():
+        parts.append("stderr: " + completed.stderr.strip())
+    if completed.stdout.strip():
+        parts.append("stdout: " + completed.stdout.strip())
+    return "\n".join(parts) or "no output"

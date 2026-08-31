@@ -22,6 +22,17 @@ if schema_index is not None:
 log = os.environ.get("FAKE_CODEX_LOG", "").strip()
 if log:
     Path(log).write_text(json.dumps(record), encoding="utf-8")
+attempt_file = os.environ.get("FAKE_CODEX_ATTEMPT_FILE", "").strip()
+attempt = 1
+if attempt_file:
+    path = Path(attempt_file)
+    attempt = int(path.read_text(encoding="utf-8")) + 1 if path.exists() else 1
+    path.write_text(str(attempt), encoding="utf-8")
+fail_attempts = int(os.environ.get("FAKE_CODEX_FAIL_ATTEMPTS", "0"))
+if attempt <= fail_attempts:
+    print(json.dumps({"type": "error", "message": "synthetic transient failure"}))
+    print("synthetic warning", file=sys.stderr)
+    raise SystemExit(1)
 score = os.environ.get("FAKE_CODEX_SCORE", "").strip()
 output.write_text(
     json.dumps({"score": float(score)}) if score else "synthetic target response",

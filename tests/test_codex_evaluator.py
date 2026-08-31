@@ -58,6 +58,7 @@ class CodexEvaluatorTests(unittest.TestCase):
             IMPLEMENTATION_ID,
         )
         self.assertEqual(result.metadata["evaluator_id"], "judge-v1")
+        self.assertEqual(result.metadata["attempts"], 1)
         self.assertEqual(result.metadata["input_tokens"], 21)
         self.assertIn("--ephemeral", recorded["args"])
         self.assertIn("--ignore-user-config", recorded["args"])
@@ -130,6 +131,37 @@ class CodexEvaluatorTests(unittest.TestCase):
                 elapsed = time.monotonic() - started
 
         self.assertLess(elapsed, 3.0)
+
+    def test_transient_exit_is_retried_with_the_same_frozen_prompt(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            attempts = root / "attempts.txt"
+            log = root / "codex-log.json"
+            with patch.dict(
+                os.environ,
+                {
+                    "FAKE_CODEX_ATTEMPT_FILE": str(attempts),
+                    "FAKE_CODEX_FAIL_ATTEMPTS": "2",
+                    "FAKE_CODEX_LOG": str(log),
+                    "FAKE_CODEX_SCORE": "1",
+                },
+                clear=False,
+            ):
+                result = CodexEvaluator(
+                    evaluator_id="judge-v1",
+                    model="judge-model",
+                    reasoning_effort="xhigh",
+                    state_home=root / "state",
+                    codex_bin=str(FAKE_CODEX),
+                    timeout_seconds=5,
+                ).evaluate(_request())
+            recorded = json.loads(log.read_text(encoding="utf-8"))
+            attempt_count = attempts.read_text(encoding="utf-8")
+
+        self.assertEqual(result.score, 1.0)
+        self.assertEqual(result.metadata["attempts"], 3)
+        self.assertEqual(attempt_count, "3")
+        self.assertIn("candidate response", recorded["prompt"])
 
 
 def _request() -> EvaluationRequest:
