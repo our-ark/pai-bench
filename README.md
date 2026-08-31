@@ -75,8 +75,15 @@ split membership, or rubric.
 bin/identity-benchmark matrix \
   .pai-bench/experiments/test.json \
   --output-dir .pai-bench/reports/pai-bench-v1-test \
+  --max-workers 8 \
   --resume
 ```
+
+`--max-workers` parallelizes complete profile-model conditions in separate
+processes and isolated state directories. Probes within one condition remain
+ordered so governed updates and rollbacks preserve their intended state.
+Completed conditions are written atomically by the parent process and remain
+resumable after interruption.
 
 Use the development split for pipeline work. Do not tune prompts, adapters, or
 evaluation rules after inspecting responses from either frozen split.

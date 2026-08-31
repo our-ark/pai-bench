@@ -90,5 +90,8 @@ identity-benchmark matrix releases/v1.0/data/dev-enoch-local.json \
   --output-dir .pai-bench/reports/enoch-dev --plan
 ```
 
-After reviewing the plan, remove `--plan` and add `--resume`. Validate the
-integration on the development split before launching either frozen split.
+After reviewing the plan, remove `--plan` and add `--resume`. Independent
+profile-model conditions may run concurrently with `--max-workers`; each
+worker uses a separate process and state directory, while probes inside a
+condition remain ordered. Validate the integration on the development split
+before launching either frozen split.

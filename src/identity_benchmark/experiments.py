@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime
 import hashlib
@@ -186,6 +187,7 @@ class ExperimentReport:
     batch_size: int = 0
     batch_index: int = 1
     total_batches: int = 1
+    max_workers: int = 1
 
     @property
     def profile_id(self) -> str:
@@ -222,6 +224,7 @@ class ExperimentReport:
                 "batch_size": self.batch_size or (self.total_runs or len(self.runs)),
                 "batch_index": self.batch_index,
                 "total_batches": self.total_batches,
+                "max_workers": self.max_workers,
                 "selected_run_ids": list(self.selected_run_ids),
             },
             "evaluator_ids": sorted(
@@ -501,6 +504,7 @@ def run_experiment(
     batch_size: int | None = None,
     batch_index: int = 1,
     resume: bool = False,
+    max_workers: int = 1,
     agent_factory: AgentFactory | None = None,
     evaluator_factory: EvaluatorFactory | None = None,
 ) -> ExperimentReport:
@@ -510,6 +514,7 @@ def run_experiment(
         raise ExperimentError(
             "experiment manifest must define a Codex evaluator"
         )
+    workers = _positive_int(max_workers, "max_workers")
     plan = plan_experiment(
         spec, batch_size=batch_size, batch_index=batch_index
     )
@@ -527,36 +532,82 @@ def run_experiment(
     runs_by_id = dict(existing)
     with TemporaryDirectory(prefix=f"{spec.experiment_id}-state-") as temporary:
         state_parent = Path(temporary)
-        for planned in plan.selected_runs:
-            prior = runs_by_id.get(planned.run_id)
-            if prior is not None and prior.report.errors == 0:
-                continue
+        pending = tuple(
+            planned
+            for planned in plan.selected_runs
+            if (
+                planned.run_id not in runs_by_id
+                or runs_by_id[planned.run_id].report.errors != 0
+            )
+        )
+        state_homes: dict[str, Path] = {}
+        for planned in pending:
             state_home = state_parent / planned.run_id
             state_home.mkdir(mode=0o700)
-            run = _run_condition(
-                spec,
-                planned.profile,
-                run_id=planned.run_id,
-                state_home=state_home,
-                model=planned.model,
-                reasoning_effort=planned.reasoning_effort,
-                identity_mode=planned.identity_mode,
-                repetition=planned.repetition,
-                fingerprint=planned.fingerprint,
-                agent_factory=active_agent_factory,
-                evaluator_factory=active_evaluator_factory,
+            state_homes[planned.run_id] = state_home
+
+        if workers == 1:
+            completed = (
+                _run_planned_condition(
+                    spec,
+                    planned,
+                    state_homes[planned.run_id],
+                    active_agent_factory,
+                    active_evaluator_factory,
+                )
+                for planned in pending
             )
-            runs_by_id[planned.run_id] = run
-            _write_json(output / "runs" / f"{planned.run_id}.json", run.to_dict())
-            _write_experiment_report(
-                output,
-                spec,
-                plan,
-                runs_by_id,
-                unique_profiles,
-                population_groups,
-                started_at,
-            )
+            for run in completed:
+                runs_by_id[run.run_id] = run
+                _write_json(output / "runs" / f"{run.run_id}.json", run.to_dict())
+                _write_experiment_report(
+                    output,
+                    spec,
+                    plan,
+                    runs_by_id,
+                    unique_profiles,
+                    population_groups,
+                    started_at,
+                    max_workers=workers,
+                )
+        elif pending:
+            execution_order = _interleave_profiles(pending)
+            with ProcessPoolExecutor(
+                max_workers=min(workers, len(execution_order))
+            ) as executor:
+                futures = {
+                    executor.submit(
+                        _run_planned_condition,
+                        spec,
+                        planned,
+                        state_homes[planned.run_id],
+                        active_agent_factory,
+                        active_evaluator_factory,
+                    ): planned
+                    for planned in execution_order
+                }
+                for future in as_completed(futures):
+                    planned = futures[future]
+                    try:
+                        run = future.result()
+                    except Exception as error:
+                        raise ExperimentError(
+                            f"Parallel worker for {planned.run_id} failed: {error}"
+                        ) from error
+                    runs_by_id[run.run_id] = run
+                    _write_json(
+                        output / "runs" / f"{run.run_id}.json", run.to_dict()
+                    )
+                    _write_experiment_report(
+                        output,
+                        spec,
+                        plan,
+                        runs_by_id,
+                        unique_profiles,
+                        population_groups,
+                        started_at,
+                        max_workers=workers,
+                    )
     return _write_experiment_report(
         output,
         spec,
@@ -565,7 +616,51 @@ def run_experiment(
         unique_profiles,
         population_groups,
         started_at,
+        max_workers=workers,
     )
+
+
+def _run_planned_condition(
+    spec: ExperimentSpec,
+    planned: PlannedRun,
+    state_home: Path,
+    agent_factory: AgentFactory,
+    evaluator_factory: EvaluatorFactory,
+) -> ExperimentRun:
+    """Run one process-isolated condition; safe to submit to a process pool."""
+    return _run_condition(
+        spec,
+        planned.profile,
+        run_id=planned.run_id,
+        state_home=state_home,
+        model=planned.model,
+        reasoning_effort=planned.reasoning_effort,
+        identity_mode=planned.identity_mode,
+        repetition=planned.repetition,
+        fingerprint=planned.fingerprint,
+        agent_factory=agent_factory,
+        evaluator_factory=evaluator_factory,
+    )
+
+
+def _interleave_profiles(
+    runs: tuple[PlannedRun, ...],
+) -> tuple[PlannedRun, ...]:
+    """Prefer distinct profiles in each scheduling wave without changing run IDs."""
+    profile_ids = tuple(dict.fromkeys(run.profile.profile_id for run in runs))
+    queues = {
+        profile_id: [
+            run for run in runs if run.profile.profile_id == profile_id
+        ]
+        for profile_id in profile_ids
+    }
+    ordered: list[PlannedRun] = []
+    while len(ordered) < len(runs):
+        for profile_id in profile_ids:
+            queue = queues[profile_id]
+            if queue:
+                ordered.append(queue.pop(0))
+    return tuple(ordered)
 
 
 def format_experiment_plan(plan: ExperimentPlan) -> str:
@@ -809,6 +904,8 @@ def _write_experiment_report(
     profiles: tuple[BenchmarkProfile, ...],
     population_groups: dict[str, tuple[str, str]],
     started_at: str,
+    *,
+    max_workers: int,
 ) -> ExperimentReport:
     materialized = tuple(
         runs_by_id[planned.run_id]
@@ -835,6 +932,7 @@ def _write_experiment_report(
         batch_size=plan.batch_size,
         batch_index=plan.batch_index,
         total_batches=plan.total_batches,
+        max_workers=max_workers,
     )
     _write_json(output / "experiment-report.json", report.to_dict())
     return report
@@ -850,6 +948,7 @@ def format_experiment_report(report: ExperimentReport) -> str:
         f"{report.total_runs or len(report.runs)} completed "
         f"({len(report.runs)} attempted)",
         f"Batch: {report.batch_index}/{report.total_batches}",
+        f"Workers: {report.max_workers}",
         f"Evaluators: {', '.join(sorted({run.report.evaluator_id for run in report.runs}))}",
         f"Probe errors: {report.errors}",
         "",

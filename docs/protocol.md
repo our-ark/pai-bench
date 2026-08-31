@@ -167,10 +167,15 @@ configuration. The bundled runner constructs `EnochAdapter` directly; another
 ```bash
 bin/identity-benchmark matrix EXPERIMENT.json \
   --output-dir .pai-bench/reports/run-001 \
-  --batch-size 4 --batch-index 1 --resume
+  --batch-size 8 --batch-index 1 --max-workers 8 --resume
 ```
 
 Use `--plan` before launching a campaign. Runs are atomic and resumable.
+`--max-workers` executes complete conditions in isolated processes while
+preserving probe order within each condition. The scheduler interleaves
+profiles so a worker wave samples distinct identities before starting another
+condition for the same identity. Only the parent process writes run artifacts
+and aggregate reports.
 Reports include per-probe results, identity dimensions, counterfactual-pair
 metrics, capability controls, constraint agreement, error counts, and adapter
 provenance.

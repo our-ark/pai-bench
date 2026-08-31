@@ -80,6 +80,7 @@ def main(argv: list[str] | None = None) -> None:
                 batch_size=args.batch_size,
                 batch_index=args.batch_index,
                 resume=args.resume,
+                max_workers=args.max_workers,
             )
             print(format_experiment_report(report))
             return
@@ -229,6 +230,15 @@ def _parser() -> argparse.ArgumentParser:
         "--resume",
         action="store_true",
         help="reuse verified completed runs and retry incomplete runs",
+    )
+    matrix.add_argument(
+        "--max-workers",
+        type=_positive_integer,
+        default=1,
+        help=(
+            "run this many isolated matrix conditions concurrently "
+            "(default: 1)"
+        ),
     )
     matrix.add_argument(
         "--plan",

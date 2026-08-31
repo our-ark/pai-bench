@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from concurrent.futures import Future
 import json
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +26,27 @@ from evaluator_support import run_test_experiment as run_experiment
 PROFILE = FIXTURES / "synthetic-profile.json"
 VECTOR_NORTH = FIXTURES / "counterfactual" / "vector-north.json"
 VECTOR_SOUTH = VECTOR_NORTH.with_name("vector-south.json")
+
+
+class _ImmediateProcessPool:
+    """Deterministic executor used where test sandboxes forbid OS semaphores."""
+
+    def __init__(self, *, max_workers: int) -> None:
+        self.max_workers = max_workers
+
+    def __enter__(self) -> "_ImmediateProcessPool":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def submit(self, function, *args, **kwargs) -> Future:
+        future: Future = Future()
+        try:
+            future.set_result(function(*args, **kwargs))
+        except BaseException as error:
+            future.set_exception(error)
+        return future
 
 
 class IdentityBenchmarkExperimentTests(unittest.TestCase):
@@ -93,6 +116,27 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
         self.assertEqual(saved["experiment_id"], "fixture-matrix")
         self.assertIn("Identity gain", format_experiment_report(report))
         self.assertIn("behavioral_consistency", format_experiment_report(report))
+
+    def test_parallel_scheduler_aggregates_atomic_conditions(self) -> None:
+        with TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            spec = load_experiment_spec(self._manifest(temporary))
+            output = temporary / "reports"
+
+            with patch(
+                "identity_benchmark.experiments.ProcessPoolExecutor",
+                _ImmediateProcessPool,
+            ):
+                report = run_experiment(spec, output, max_workers=2)
+            saved = json.loads(
+                (output / "experiment-report.json").read_text(encoding="utf-8")
+            )
+
+        self.assertTrue(report.is_complete)
+        self.assertEqual(len(report.runs), 2)
+        self.assertEqual(report.max_workers, 2)
+        self.assertEqual(saved["progress"]["max_workers"], 2)
+        self.assertIn("Workers: 2", format_experiment_report(report))
 
     def test_bundled_local_manifest_resolves_to_the_library_root(self) -> None:
         manifest = FIXTURES / "local-smoke-experiment.json"
