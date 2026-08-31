@@ -282,7 +282,7 @@ def _validate_evaluator_request(request: Mapping[str, Any]) -> None:
         raise CodexEvaluatorError("evaluator probe messages must be a non-empty list")
     if not all(
         isinstance(message, dict)
-        and message.get("role") in {"user", "assistant"}
+        and message.get("role") in {"system", "user", "assistant"}
         and isinstance(message.get("content"), str)
         for message in messages
     ):

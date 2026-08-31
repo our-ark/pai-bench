@@ -232,7 +232,11 @@ def parse_probe_bindings(value: object) -> ProbeBindings:
             oracle,
             f"probe bindings.oracles.{probe_id}",
             required={"expectations"},
-            optional={"after_response", "reference_statements"},
+            optional={
+                "before_response",
+                "after_response",
+                "reference_statements",
+            },
         )
         oracles[probe_id] = _json_mapping(oracle, f"probe bindings.oracles.{probe_id}")
     return ProbeBindings(

@@ -65,6 +65,10 @@
           "enum": ["identity", "format", "constraint"],
           "default": "identity",
           "description": "Score identity semantics in the headline result; report exact format and other deterministic observable constraints separately."
+        },
+        "component": {
+          "$ref": "#/$defs/identifier",
+          "description": "Optional named construct component used for diagnostic scoring."
         }
       }
     },
@@ -75,6 +79,26 @@
       "properties": {
         "type": {"const": "replace-agent-identity"},
         "agent_identity": {"$ref": "ai-agent-identity.schema.json"}
+      }
+    },
+    "authorizationEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheme", "credential", "scope"],
+      "properties": {
+        "scheme": {"$ref": "#/$defs/identifier"},
+        "credential": {"type": "string", "minLength": 1},
+        "scope": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "transitionAttempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transition", "authorization", "expected_acceptance"],
+      "properties": {
+        "transition": {"$ref": "#/$defs/stateTransition"},
+        "authorization": {"$ref": "#/$defs/authorizationEnvelope"},
+        "expected_acceptance": {"type": "boolean"}
       }
     },
     "probe": {
@@ -111,6 +135,7 @@
           "uniqueItems": true,
           "items": {"$ref": "#/$defs/identifier"}
         },
+        "before_response": {"$ref": "#/$defs/transitionAttempt"},
         "after_response": {"$ref": "#/$defs/stateTransition"},
         "reference_statements": {
           "type": "array",

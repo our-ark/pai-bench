@@ -13,8 +13,11 @@ from identity_benchmark.contracts import (
     INSTANCE_PROTOCOL_VERSION,
     InstanceResponse,
     JsonValue,
+    TransitionAttemptRequest,
+    TransitionDecision,
     TransitionRequest,
     parse_instance_response,
+    parse_transition_decision,
 )
 from identity_benchmark.processes import run_text_command
 
@@ -36,6 +39,14 @@ class TransitionAdapter(Protocol):
     """Optional control plane for applying state changes after inference."""
 
     def apply_transition(self, request: TransitionRequest) -> None: ...
+
+
+class TransitionAttemptAdapter(Protocol):
+    """Optional authorization-aware control plane before inference."""
+
+    def attempt_transition(
+        self, request: TransitionAttemptRequest
+    ) -> TransitionDecision: ...
 
 
 # Backward-compatible name used by benchmark v1 callers.
@@ -80,6 +91,21 @@ class CommandInstance:
         except (json.JSONDecodeError, BenchmarkProfileError) as error:
             raise InstanceError(
                 f"Instance returned an invalid transition response: {error}"
+            ) from error
+
+    def attempt_transition(
+        self,
+        request: TransitionAttemptRequest,
+    ) -> TransitionDecision:
+        completed = self._invoke(
+            request.to_dict(), operation="transition attempt"
+        )
+        try:
+            value = json.loads(completed.stdout)
+            return parse_transition_decision(value)
+        except (json.JSONDecodeError, BenchmarkProfileError) as error:
+            raise InstanceError(
+                f"Instance returned an invalid transition decision: {error}"
             ) from error
 
     def _invoke(

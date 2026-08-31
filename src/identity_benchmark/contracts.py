@@ -72,6 +72,7 @@ class Expectation:
     weight: float = 1.0
     gate: bool = False
     aspect: ExpectationAspect = "identity"
+    component: str = ""
 
     def to_dict(self) -> dict[str, JsonValue]:
         value: dict[str, JsonValue] = {
@@ -82,6 +83,8 @@ class Expectation:
         }
         if self.aspect != "identity":
             value["aspect"] = self.aspect
+        if self.component:
+            value["component"] = self.component
         return value
 
 
@@ -98,6 +101,34 @@ class StateTransition:
 
 
 @dataclass(frozen=True)
+class AuthorizationEnvelope:
+    scheme: str
+    credential: str
+    scope: str
+
+    def to_dict(self) -> dict[str, JsonValue]:
+        return {
+            "scheme": self.scheme,
+            "credential": self.credential,
+            "scope": self.scope,
+        }
+
+
+@dataclass(frozen=True)
+class TransitionAttempt:
+    transition: StateTransition
+    authorization: AuthorizationEnvelope
+    expected_acceptance: bool
+
+    def to_dict(self) -> dict[str, JsonValue]:
+        return {
+            "transition": self.transition.to_dict(),
+            "authorization": self.authorization.to_dict(),
+            "expected_acceptance": self.expected_acceptance,
+        }
+
+
+@dataclass(frozen=True)
 class Probe:
     id: str
     dimension: Dimension
@@ -105,6 +136,7 @@ class Probe:
     expectations: tuple[Expectation, ...]
     weight: float = 1.0
     tags: tuple[str, ...] = ()
+    before_response: TransitionAttempt | None = None
     after_response: StateTransition | None = None
     reference_statements: tuple[IdentityStatement, ...] = ()
 
@@ -119,6 +151,8 @@ class Probe:
         }
         if self.after_response is not None:
             value["after_response"] = self.after_response.to_dict()
+        if self.before_response is not None:
+            value["before_response"] = self.before_response.to_dict()
         if self.reference_statements:
             value["reference_statements"] = [
                 statement.to_dict() for statement in self.reference_statements
@@ -181,6 +215,32 @@ class TransitionRequest:
             "probe_id": self.probe_id,
             "transition": self.transition.to_dict(),
         }
+
+
+@dataclass(frozen=True)
+class TransitionAttemptRequest:
+    profile_id: str
+    probe_id: str
+    transition: StateTransition
+    authorization: AuthorizationEnvelope
+    protocol_version: int = INSTANCE_PROTOCOL_VERSION
+
+    def to_dict(self) -> dict[str, JsonValue]:
+        return {
+            "protocol_version": self.protocol_version,
+            "operation": "attempt_transition",
+            "profile_id": self.profile_id,
+            "probe_id": self.probe_id,
+            "transition": self.transition.to_dict(),
+            "authorization": self.authorization.to_dict(),
+        }
+
+
+@dataclass(frozen=True)
+class TransitionDecision:
+    accepted: bool
+    metadata: dict[str, JsonValue] = field(default_factory=dict)
+    protocol_version: int = INSTANCE_PROTOCOL_VERSION
 
 
 @dataclass(frozen=True)
@@ -465,6 +525,72 @@ def parse_transition_request(value: object) -> TransitionRequest:
     )
 
 
+def parse_transition_attempt_request(value: object) -> TransitionAttemptRequest:
+    root = _mapping(value, "transition attempt request")
+    _keys(
+        root,
+        "transition attempt request",
+        required={
+            "protocol_version",
+            "operation",
+            "profile_id",
+            "probe_id",
+            "transition",
+            "authorization",
+        },
+    )
+    if root["protocol_version"] != INSTANCE_PROTOCOL_VERSION:
+        raise BenchmarkProfileError(
+            "transition attempt protocol_version must be "
+            f"{INSTANCE_PROTOCOL_VERSION}; received {root['protocol_version']!r}."
+        )
+    if root["operation"] != "attempt_transition":
+        raise BenchmarkProfileError(
+            "transition attempt request.operation must be 'attempt_transition'."
+        )
+    return TransitionAttemptRequest(
+        profile_id=_identifier(
+            root["profile_id"], "transition attempt request.profile_id"
+        ),
+        probe_id=_identifier(
+            root["probe_id"], "transition attempt request.probe_id"
+        ),
+        transition=_state_transition(
+            root["transition"], "transition attempt request.transition"
+        ),
+        authorization=_authorization_envelope(
+            root["authorization"], "transition attempt request.authorization"
+        ),
+    )
+
+
+def parse_transition_decision(value: object) -> TransitionDecision:
+    root = _mapping(value, "transition decision")
+    _keys(
+        root,
+        "transition decision",
+        required={"protocol_version", "accepted"},
+        optional={"metadata"},
+    )
+    if root["protocol_version"] != INSTANCE_PROTOCOL_VERSION:
+        raise BenchmarkProfileError(
+            "transition decision protocol_version must be "
+            f"{INSTANCE_PROTOCOL_VERSION}; received {root['protocol_version']!r}."
+        )
+    metadata = root.get("metadata", {})
+    if not isinstance(metadata, dict):
+        raise BenchmarkProfileError(
+            "transition decision.metadata must be an object."
+        )
+    return TransitionDecision(
+        accepted=_boolean(root["accepted"], "transition decision.accepted"),
+        metadata={
+            str(key): _json_value(item, f"transition decision.metadata.{key}")
+            for key, item in metadata.items()
+        },
+    )
+
+
 def _statement(value: object, index: int) -> IdentityStatement:
     label = f"statements[{index}]"
     item = _mapping(value, label)
@@ -482,7 +608,13 @@ def _probe(value: object, index: int) -> Probe:
         item,
         label,
         required={"id", "dimension", "messages", "expectations"},
-        optional={"weight", "tags", "after_response", "reference_statements"},
+        optional={
+            "weight",
+            "tags",
+            "before_response",
+            "after_response",
+            "reference_statements",
+        },
     )
     dimension = _text(item["dimension"], f"{label}.dimension")
     if dimension not in DIMENSIONS:
@@ -530,6 +662,13 @@ def _probe(value: object, index: int) -> Probe:
         expectations=expectations,
         weight=_positive_number(item.get("weight", 1.0), f"{label}.weight"),
         tags=tags,
+        before_response=(
+            _transition_attempt(
+                item["before_response"], f"{label}.before_response"
+            )
+            if "before_response" in item
+            else None
+        ),
         after_response=(
             _state_transition(item["after_response"], f"{label}.after_response")
             if "after_response" in item
@@ -558,7 +697,7 @@ def _expectation(value: object, probe_label: str, index: int) -> Expectation:
         item,
         label,
         required={"type", "value"},
-        optional={"weight", "gate", "aspect"},
+        optional={"weight", "gate", "aspect", "component"},
     )
     expectation_type = _text(item["type"], f"{label}.type")
     if expectation_type not in EXPECTATION_TYPES:
@@ -582,6 +721,11 @@ def _expectation(value: object, probe_label: str, index: int) -> Expectation:
         weight=_positive_number(item.get("weight", 1.0), f"{label}.weight"),
         gate=_boolean(item.get("gate", False), f"{label}.gate"),
         aspect=aspect,  # type: ignore[arg-type]
+        component=(
+            _identifier(item["component"], f"{label}.component")
+            if "component" in item
+            else ""
+        ),
     )
 
 
@@ -600,6 +744,37 @@ def _state_transition(value: object, label: str) -> StateTransition:
             str(key): _json_value(item, f"{label}.agent_identity.{key}")
             for key, item in identity.items()
         },
+    )
+
+
+def _authorization_envelope(
+    value: object,
+    label: str,
+) -> AuthorizationEnvelope:
+    item = _mapping(value, label)
+    _keys(item, label, required={"scheme", "credential", "scope"})
+    return AuthorizationEnvelope(
+        scheme=_identifier(item["scheme"], f"{label}.scheme"),
+        credential=_text(item["credential"], f"{label}.credential"),
+        scope=_identifier(item["scope"], f"{label}.scope"),
+    )
+
+
+def _transition_attempt(value: object, label: str) -> TransitionAttempt:
+    item = _mapping(value, label)
+    _keys(
+        item,
+        label,
+        required={"transition", "authorization", "expected_acceptance"},
+    )
+    return TransitionAttempt(
+        transition=_state_transition(item["transition"], f"{label}.transition"),
+        authorization=_authorization_envelope(
+            item["authorization"], f"{label}.authorization"
+        ),
+        expected_acceptance=_boolean(
+            item["expected_acceptance"], f"{label}.expected_acceptance"
+        ),
     )
 
 

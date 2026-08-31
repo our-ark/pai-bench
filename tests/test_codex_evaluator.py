@@ -103,7 +103,8 @@ def _request() -> dict:
             "id": "designation",
             "dimension": "recognition",
             "messages": [
-                {"role": "user", "content": "State the designation."}
+                {"role": "system", "content": "Use the installed identity."},
+                {"role": "user", "content": "State the designation."},
             ],
             "expectations": [
                 {

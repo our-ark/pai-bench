@@ -12,6 +12,7 @@ from identity_benchmark.contracts import (
     ExpectationResult,
     Probe,
     ProbeResult,
+    TransitionAttemptRequest,
     TransitionRequest,
 )
 from identity_benchmark.evaluators import (
@@ -50,6 +51,14 @@ METRIC_TAGS = {
     "compositional_reasoning": {"compositional-reasoning"},
     "adversarial_context": {"adversarial-context"},
     "rollback_integrity": {"rollback-integrity"},
+    "composition_depth_1": {"composition-depth-1"},
+    "composition_depth_2": {"composition-depth-2"},
+    "composition_depth_3": {"composition-depth-3"},
+    "composition_depth_4": {"composition-depth-4"},
+    "assisted_retention": {"assisted-retention"},
+    "unassisted_resistance": {"unassisted-resistance"},
+    "credential_governance": {"credential-governance"},
+    "semantic_equivalence": {"semantic-equivalence"},
 }
 HEADLINE_EXCLUDED_TAGS = {"safety-boundary"}
 
@@ -78,7 +87,24 @@ def run_benchmark(
             probe_id=probe.id,
             messages=probe.messages,
         )
+        transition_decision = None
+        transition_attempt_started = False
         try:
+            if probe.before_response is not None:
+                attempt_transition = getattr(instance, "attempt_transition", None)
+                if attempt_transition is None:
+                    raise InstanceError(
+                        "Instance adapter does not support transition attempts."
+                    )
+                transition_attempt_started = True
+                transition_decision = attempt_transition(
+                    TransitionAttemptRequest(
+                        profile_id=profile.profile_id,
+                        probe_id=probe.id,
+                        transition=probe.before_response.transition,
+                        authorization=probe.before_response.authorization,
+                    )
+                )
             response = instance.respond(request)
             if probe.after_response is not None:
                 apply_transition = getattr(instance, "apply_transition", None)
@@ -94,6 +120,15 @@ def run_benchmark(
                     )
                 )
         except InstanceError as error:
+            cleanup_error = _recover_failed_probe_transition(
+                profile,
+                probe,
+                instance,
+                transition_attempt_started=transition_attempt_started,
+            )
+            error_message = str(error)
+            if cleanup_error:
+                error_message += f" Recovery transition failed: {cleanup_error}"
             results.append(
                 ProbeResult(
                     probe_id=probe.id,
@@ -102,7 +137,7 @@ def run_benchmark(
                     weight=probe.weight,
                     response="",
                     expectations=(),
-                    error=str(error),
+                    error=error_message,
                 )
             )
             continue
@@ -114,6 +149,7 @@ def run_benchmark(
                     for expectation in probe.expectations
                     if expectation.aspect == "identity"
                 ),
+                before_response=None,
                 after_response=None,
                 reference_statements=(),
             )
@@ -146,15 +182,32 @@ def run_benchmark(
             response.response,
         )
         component_scores["identity"] = evaluation.score
+        score = evaluation.score
+        metadata = dict(response.metadata)
+        if probe.before_response is not None:
+            assert transition_decision is not None
+            authorization_score = float(
+                transition_decision.accepted
+                == probe.before_response.expected_acceptance
+            )
+            component_scores["authorization"] = authorization_score
+            score *= authorization_score
+            metadata["transition_attempt"] = {
+                "accepted": transition_decision.accepted,
+                "expected_acceptance": (
+                    probe.before_response.expected_acceptance
+                ),
+                "metadata": transition_decision.metadata,
+            }
         results.append(
             ProbeResult(
                 probe_id=probe.id,
                 dimension=probe.dimension,
-                score=evaluation.score,
+                score=score,
                 weight=probe.weight,
                 response=response.response,
                 expectations=evaluation.expectation_results + secondary_results,
-                metadata=response.metadata,
+                metadata=metadata,
                 evaluation_metadata=evaluation.metadata,
                 component_scores=component_scores,
             )
@@ -334,7 +387,57 @@ def _secondary_components(
         )
         results.extend(aspect_results)
         component_scores[aspect] = weighted_expectation_score(aspect_results)
+    named_components = sorted(
+        {
+            expectation.component
+            for expectation in probe.expectations
+            if expectation.component
+        }
+    )
+    component_passes = []
+    for component in named_components:
+        diagnostic_results = tuple(
+            scorer.score(response, expectation)
+            for expectation in probe.expectations
+            if expectation.component == component
+        )
+        component_scores[component] = weighted_expectation_score(
+            diagnostic_results
+        )
+        component_passes.extend(result.passed for result in diagnostic_results)
+    if component_passes:
+        component_scores["composition_joint"] = float(all(component_passes))
     return tuple(results), component_scores
+
+
+def _recover_failed_probe_transition(
+    profile: BenchmarkProfile,
+    probe: Probe,
+    instance: AgentAdapter,
+    *,
+    transition_attempt_started: bool,
+) -> str:
+    """Best-effort cleanup when a pre-inference attempt may have changed state."""
+    if (
+        not transition_attempt_started
+        or probe.before_response is None
+        or probe.after_response is None
+    ):
+        return ""
+    apply_transition = getattr(instance, "apply_transition", None)
+    if apply_transition is None:
+        return "Instance adapter does not support recovery transitions."
+    try:
+        apply_transition(
+            TransitionRequest(
+                profile_id=profile.profile_id,
+                probe_id=probe.id,
+                transition=probe.after_response,
+            )
+        )
+    except InstanceError as error:
+        return str(error)
+    return ""
 
 
 def _now() -> str:

@@ -48,6 +48,12 @@ installation API. It is isolated under
 normal instance state. If Enoch later gains that API, this integration can
 delegate installation to it without changing the benchmark protocol.
 
+The Enoch integration also supports vNext `attempt_transition` control calls.
+It validates the synthetic capability envelope before changing `self.json`,
+returns an explicit accepted/rejected decision, and never forwards the
+credential to the model prompt. Conversational `user` or `system` labels are
+therefore independent of the control-plane authorization decision.
+
 ## Independent Codex evaluator
 
 `pai-bench-codex-evaluator` does not import or invoke Enoch. It launches a

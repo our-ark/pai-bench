@@ -32,6 +32,7 @@
       "required": ["expectations"],
       "properties": {
         "expectations": {"type": "array", "minItems": 1},
+        "before_response": {"type": "object"},
         "after_response": {"type": "object"},
         "reference_statements": {"type": "array", "minItems": 1}
       }

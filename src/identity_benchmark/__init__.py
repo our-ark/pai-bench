@@ -7,14 +7,21 @@ from identity_benchmark.target_adapters import (
     InstanceAdapter,
     InstanceError,
     TransitionAdapter,
+    TransitionAttemptAdapter,
 )
 from identity_benchmark.contracts import (
+    AuthorizationEnvelope,
     BenchmarkProfile,
     BenchmarkProfileError,
     BenchmarkReport,
+    TransitionAttempt,
+    TransitionAttemptRequest,
+    TransitionDecision,
     TransitionRequest,
     load_benchmark_profile,
     parse_benchmark_request,
+    parse_transition_attempt_request,
+    parse_transition_decision,
     parse_transition_request,
 )
 from identity_benchmark.runner import (
@@ -76,9 +83,16 @@ from identity_benchmark.pai_bench import (
     generate_pai_bench,
     write_pai_bench,
 )
+from identity_benchmark.vnext import (
+    VNEXT_GENERATOR_VERSION,
+    VNextError,
+    generate_vnext,
+    write_vnext,
+)
 
 __all__ = [
     "AgentAdapter",
+    "AuthorizationEnvelope",
     "BenchmarkProfile",
     "BenchmarkProfileError",
     "BenchmarkReport",
@@ -127,14 +141,24 @@ __all__ = [
     "load_probe_suite",
     "load_saved_experiment_runs",
     "parse_benchmark_request",
+    "parse_transition_attempt_request",
+    "parse_transition_decision",
     "parse_transition_request",
     "passes_counterfactual_gates",
     "run_benchmark",
     "run_experiment",
+    "TransitionAttempt",
+    "TransitionAttemptRequest",
+    "TransitionDecision",
     "TransitionRequest",
     "TransitionAdapter",
+    "TransitionAttemptAdapter",
     "validate_report_integrity",
+    "VNEXT_GENERATOR_VERSION",
+    "VNextError",
+    "generate_vnext",
     "write_population",
+    "write_vnext",
     "write_pai_bench",
     "write_statistical_analysis",
 ]

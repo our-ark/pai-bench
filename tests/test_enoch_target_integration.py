@@ -18,6 +18,7 @@ from identity_benchmark.integrations.enoch_target import (
     EnochTargetError,
     handle_payload,
 )
+from identity_benchmark.authorization import invalid_envelope, valid_envelope
 from identity_benchmark.probe_suites import load_identity_profile
 
 
@@ -99,6 +100,54 @@ class EnochTargetIntegrationTests(unittest.TestCase):
         self.assertTrue(result["applied"])
         self.assertEqual(
             installed["identity"]["names"]["canonical"], "UPDATED-NAME"
+        )
+
+    def test_capability_authorization_is_orthogonal_to_message_role(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = _config(root)
+            handle_payload(
+                _request(),
+                config,
+                completion=lambda _prompt, _config: EnochCompletion(
+                    response="before", metadata={}
+                ),
+            )
+            changed = deepcopy(config.profile.agent_identity)
+            assert changed is not None
+            changed["identity"]["names"]["canonical"] = "UPDATED-NAME"
+            invalid = handle_payload(
+                _attempt_payload(
+                    config.profile.profile_id,
+                    changed,
+                    invalid_envelope(config.profile.profile_id).to_dict(),
+                ),
+                config,
+            )
+            after_invalid = json.loads(
+                (config.state_home / "self.json").read_text(encoding="utf-8")
+            )
+            valid = handle_payload(
+                _attempt_payload(
+                    config.profile.profile_id,
+                    changed,
+                    valid_envelope(config.profile.profile_id).to_dict(),
+                ),
+                config,
+            )
+            after_valid = json.loads(
+                (config.state_home / "self.json").read_text(encoding="utf-8")
+            )
+
+        self.assertFalse(invalid["accepted"])
+        self.assertNotEqual(
+            after_invalid["identity"]["names"]["canonical"],
+            "UPDATED-NAME",
+        )
+        self.assertTrue(valid["accepted"])
+        self.assertEqual(
+            after_valid["identity"]["names"]["canonical"],
+            "UPDATED-NAME",
         )
 
     def test_state_home_cannot_be_reused_for_another_profile(self) -> None:
@@ -186,6 +235,24 @@ def _capture_completion(prompt: str, prompts: list[str]) -> EnochCompletion:
         response="FABLE-JUNCTION-02",
         metadata={"input_tokens": 10, "adapter": "cannot-override"},
     )
+
+
+def _attempt_payload(
+    profile_id: str,
+    identity: dict,
+    authorization: dict,
+) -> dict:
+    return {
+        "protocol_version": 1,
+        "operation": "attempt_transition",
+        "profile_id": profile_id,
+        "probe_id": "credential-attempt",
+        "transition": {
+            "type": "replace-agent-identity",
+            "agent_identity": identity,
+        },
+        "authorization": authorization,
+    }
 
 
 if __name__ == "__main__":

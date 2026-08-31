@@ -32,6 +32,7 @@ from identity_benchmark.population import (
     PopulationError,
     write_population,
 )
+from identity_benchmark.vnext import VNextError, write_vnext
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -111,6 +112,11 @@ def main(argv: list[str] | None = None) -> None:
                 f"seed {args.seed}, {len(paths)} files."
             )
             return
+        if args.action == "generate-vnext":
+            paths = write_vnext(args.output_dir, check=args.check)
+            verb = "Verified" if args.check else "Generated"
+            print(f"{verb} vNext development suite: {len(paths)} files.")
+            return
         profile = load_benchmark_profile(args.profile)
         if not instance_command:
             parser.error("run requires an instance command after '--'")
@@ -132,6 +138,7 @@ def main(argv: list[str] | None = None) -> None:
         PopulationError,
         RescoreError,
         StatisticalAnalysisError,
+        VNextError,
         OSError,
     ) as error:
         parser.exit(2, f"identity-benchmark: {error}\n")
@@ -230,6 +237,12 @@ def _parser() -> argparse.ArgumentParser:
     population.add_argument("--size", type=int, default=DEFAULT_SIZE)
     population.add_argument("--seed", type=int, default=DEFAULT_SEED)
     population.add_argument("--check", action="store_true")
+    vnext = subparsers.add_parser(
+        "generate-vnext",
+        help="generate or verify the non-frozen vNext development suite",
+    )
+    vnext.add_argument("output_dir", type=Path)
+    vnext.add_argument("--check", action="store_true")
     run = subparsers.add_parser("run", help="run a profile against one target instance")
     run.add_argument("profile", type=Path)
     run.add_argument("--instance-id", required=True)

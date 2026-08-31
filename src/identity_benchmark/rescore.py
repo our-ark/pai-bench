@@ -10,6 +10,8 @@ from identity_benchmark.contracts import (
     BenchmarkRequest,
     InstanceResponse,
     JsonValue,
+    TransitionAttemptRequest,
+    TransitionDecision,
     TransitionRequest,
 )
 from identity_benchmark.runner import run_benchmark
@@ -35,6 +37,29 @@ class RecordedInstance:
     def apply_transition(self, request: TransitionRequest) -> None:
         # Responses are already recorded after the original control-plane update.
         del request
+
+    def attempt_transition(
+        self,
+        request: TransitionAttemptRequest,
+    ) -> TransitionDecision:
+        try:
+            recorded = self.responses[request.probe_id].metadata[
+                "transition_attempt"
+            ]
+        except KeyError as error:
+            raise RescoreError(
+                f"saved report lacks a transition decision for {request.probe_id!r}"
+            ) from error
+        if not isinstance(recorded, dict) or not isinstance(
+            recorded.get("accepted"), bool
+        ):
+            raise RescoreError(
+                f"saved transition decision for {request.probe_id!r} is invalid"
+            )
+        return TransitionDecision(
+            accepted=recorded["accepted"],
+            metadata={"rescored": True},
+        )
 
 
 def rescore_saved_report(profile: BenchmarkProfile, path: Path):

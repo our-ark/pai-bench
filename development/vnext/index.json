@@ -1,0 +1,136 @@
+{
+  "construct_changes": [
+    "balanced composition-depth ladder",
+    "component and joint composition diagnostics",
+    "assisted versus unassisted adversarial resistance",
+    "credential validity crossed with conversational role",
+    "semantic-equivalent decision prompt variants"
+  ],
+  "counterfactual_pairs": [
+    [
+      "population-p002-a-publication-v4",
+      "population-p002-b-publication-v4"
+    ],
+    [
+      "population-p010-a-publication-v4",
+      "population-p010-b-publication-v4"
+    ],
+    [
+      "population-p018-a-publication-v4",
+      "population-p018-b-publication-v4"
+    ],
+    [
+      "population-p026-a-publication-v4",
+      "population-p026-b-publication-v4"
+    ]
+  ],
+  "generator_version": "pai-construct-vnext-dev.1",
+  "profiles": [
+    {
+      "bindings_path": "bindings/population-p002-a-publication-v4.json",
+      "composition_order": [
+        "designation",
+        "parent",
+        "mission",
+        "collaborator"
+      ],
+      "identity_path": "identities/population-p002-a-publication-v4.json",
+      "pair_id": "p002",
+      "profile_id": "population-p002-a-publication-v4",
+      "variant": "a"
+    },
+    {
+      "bindings_path": "bindings/population-p002-b-publication-v4.json",
+      "composition_order": [
+        "designation",
+        "parent",
+        "mission",
+        "collaborator"
+      ],
+      "identity_path": "identities/population-p002-b-publication-v4.json",
+      "pair_id": "p002",
+      "profile_id": "population-p002-b-publication-v4",
+      "variant": "b"
+    },
+    {
+      "bindings_path": "bindings/population-p010-a-publication-v4.json",
+      "composition_order": [
+        "parent",
+        "mission",
+        "collaborator",
+        "designation"
+      ],
+      "identity_path": "identities/population-p010-a-publication-v4.json",
+      "pair_id": "p010",
+      "profile_id": "population-p010-a-publication-v4",
+      "variant": "a"
+    },
+    {
+      "bindings_path": "bindings/population-p010-b-publication-v4.json",
+      "composition_order": [
+        "parent",
+        "mission",
+        "collaborator",
+        "designation"
+      ],
+      "identity_path": "identities/population-p010-b-publication-v4.json",
+      "pair_id": "p010",
+      "profile_id": "population-p010-b-publication-v4",
+      "variant": "b"
+    },
+    {
+      "bindings_path": "bindings/population-p018-a-publication-v4.json",
+      "composition_order": [
+        "mission",
+        "collaborator",
+        "designation",
+        "parent"
+      ],
+      "identity_path": "identities/population-p018-a-publication-v4.json",
+      "pair_id": "p018",
+      "profile_id": "population-p018-a-publication-v4",
+      "variant": "a"
+    },
+    {
+      "bindings_path": "bindings/population-p018-b-publication-v4.json",
+      "composition_order": [
+        "mission",
+        "collaborator",
+        "designation",
+        "parent"
+      ],
+      "identity_path": "identities/population-p018-b-publication-v4.json",
+      "pair_id": "p018",
+      "profile_id": "population-p018-b-publication-v4",
+      "variant": "b"
+    },
+    {
+      "bindings_path": "bindings/population-p026-a-publication-v4.json",
+      "composition_order": [
+        "collaborator",
+        "designation",
+        "parent",
+        "mission"
+      ],
+      "identity_path": "identities/population-p026-a-publication-v4.json",
+      "pair_id": "p026",
+      "profile_id": "population-p026-a-publication-v4",
+      "variant": "a"
+    },
+    {
+      "bindings_path": "bindings/population-p026-b-publication-v4.json",
+      "composition_order": [
+        "collaborator",
+        "designation",
+        "parent",
+        "mission"
+      ],
+      "identity_path": "identities/population-p026-b-publication-v4.json",
+      "pair_id": "p026",
+      "profile_id": "population-p026-b-publication-v4",
+      "variant": "b"
+    }
+  ],
+  "schema_version": 1,
+  "status": "development-not-frozen"
+}

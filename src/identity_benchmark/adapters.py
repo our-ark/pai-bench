@@ -11,6 +11,7 @@ from identity_benchmark.target_adapters import (
     InstanceAdapter,
     InstanceError,
     TransitionAdapter,
+    TransitionAttemptAdapter,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "InstanceAdapter",
     "InstanceError",
     "TransitionAdapter",
+    "TransitionAttemptAdapter",
 ]

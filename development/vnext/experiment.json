@@ -1,0 +1,76 @@
+{
+  "$schema": "../../specs/identity-benchmark-experiment.schema.json",
+  "body_root": "../../../enoch",
+  "counterfactual_pairs": [
+    [
+      "population-p002-a-publication-v4",
+      "population-p002-b-publication-v4"
+    ],
+    [
+      "population-p010-a-publication-v4",
+      "population-p010-b-publication-v4"
+    ],
+    [
+      "population-p018-a-publication-v4",
+      "population-p018-b-publication-v4"
+    ],
+    [
+      "population-p026-a-publication-v4",
+      "population-p026-b-publication-v4"
+    ]
+  ],
+  "evaluator": {
+    "command": [
+      "pai-bench-codex-evaluator"
+    ],
+    "harness": "codex-cli",
+    "id": "codex-sol-xhigh-v2",
+    "model": "gpt-5.6-sol",
+    "reasoning_effort": "xhigh",
+    "rubric_version": "pai-model-judge-v2",
+    "timeout_seconds": 600
+  },
+  "experiment_id": "pai-construct-vnext-dev-luna-medium",
+  "identity_modes": [
+    "installed"
+  ],
+  "instance_command": [
+    "pai-bench-enoch-target",
+    "--profile",
+    "{profile}",
+    "--identity-mode",
+    "{identity_mode}",
+    "--enoch-root",
+    "{body_root}"
+  ],
+  "models": [
+    "gpt-5.6-luna"
+  ],
+  "probe_bindings": {
+    "population-p002-a-publication-v4": "bindings/population-p002-a-publication-v4.json",
+    "population-p002-b-publication-v4": "bindings/population-p002-b-publication-v4.json",
+    "population-p010-a-publication-v4": "bindings/population-p010-a-publication-v4.json",
+    "population-p010-b-publication-v4": "bindings/population-p010-b-publication-v4.json",
+    "population-p018-a-publication-v4": "bindings/population-p018-a-publication-v4.json",
+    "population-p018-b-publication-v4": "bindings/population-p018-b-publication-v4.json",
+    "population-p026-a-publication-v4": "bindings/population-p026-a-publication-v4.json",
+    "population-p026-b-publication-v4": "bindings/population-p026-b-publication-v4.json"
+  },
+  "probe_suite": "probe-suite.json",
+  "profiles": [
+    "identities/population-p002-a-publication-v4.json",
+    "identities/population-p002-b-publication-v4.json",
+    "identities/population-p010-a-publication-v4.json",
+    "identities/population-p010-b-publication-v4.json",
+    "identities/population-p018-a-publication-v4.json",
+    "identities/population-p018-b-publication-v4.json",
+    "identities/population-p026-a-publication-v4.json",
+    "identities/population-p026-b-publication-v4.json"
+  ],
+  "reasoning_efforts": [
+    "medium"
+  ],
+  "repetitions": 1,
+  "schema_version": 1,
+  "timeout_seconds": 600
+}

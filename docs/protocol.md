@@ -96,6 +96,51 @@ The adapter applies the transition without exposing it to the inference call
 and returns `{"protocol_version": 1, "applied": true}`. The ordinary response
 request never contains transition or scoring data.
 
+### Authorization-aware transition attempts
+
+The non-frozen vNext extension can attempt a state transition before inference
+through the same isolated control plane. The compiled probe privately records
+the expected authorization outcome, but the target receives only the
+transition and authorization envelope:
+
+```json
+{
+  "protocol_version": 1,
+  "operation": "attempt_transition",
+  "profile_id": "profile-001",
+  "probe_id": "governance-factorial-user-valid",
+  "transition": {
+    "type": "replace-agent-identity",
+    "agent_identity": {"schema_version": 1}
+  },
+  "authorization": {
+    "scheme": "pai-bench-capability-v1",
+    "credential": "cap-...",
+    "scope": "replace-agent-identity"
+  }
+}
+```
+
+The adapter returns a decision rather than being required to apply the change:
+
+```json
+{
+  "protocol_version": 1,
+  "accepted": true,
+  "metadata": {"authorization_scheme": "pai-bench-capability-v1"}
+}
+```
+
+The runner records whether the decision matches the private expected outcome,
+then asks the ordinary probe question against whatever identity is actually
+installed. Authorization correctness is a separate component and gates the
+governance probe score. Neither the credential nor expected outcome is sent to
+the model evaluator. The deterministic capability marker used by the vNext
+development adapter separates metadata from message role; it is not production
+authentication. If inference fails after an attempted transition, a declared
+post-response recovery transition is still attempted so one failed cell does
+not contaminate the remaining stateful sequence.
+
 ## Evaluator interface
 
 Deterministic expectations score exact, inclusion, exclusion, pattern, and
@@ -106,6 +151,11 @@ provenance metadata. Target and evaluator adapters are independent.
 
 Capability probes are controls, not identity measurements. They are reported
 separately and excluded from the headline identity score.
+
+Expectations may also carry a diagnostic `component` identifier. The runner
+reports exact per-component compliance and an all-components joint diagnostic
+without replacing the blinded evaluator's semantic probe score. This lets the
+vNext composition ladder separate component omission from output constraints.
 
 ## Experiment matrix
 

@@ -12,13 +12,16 @@ import sys
 import tempfile
 from typing import Callable, Iterator, Mapping
 
+from identity_benchmark.authorization import is_authorized
 from identity_benchmark.contracts import (
     BenchmarkProfileError,
     BenchmarkRequest,
     INSTANCE_PROTOCOL_VERSION,
     JsonValue,
+    TransitionAttemptRequest,
     TransitionRequest,
     parse_benchmark_request,
+    parse_transition_attempt_request,
     parse_transition_request,
 )
 from identity_benchmark.probe_suites import IdentityProfile, load_identity_profile
@@ -88,6 +91,19 @@ def handle_payload(
     completion: Completion | None = None,
 ) -> dict[str, JsonValue]:
     root = _payload_mapping(payload)
+    if root.get("operation") == "attempt_transition":
+        request = parse_transition_attempt_request(root)
+        accepted = _attempt_transition(request, config)
+        return {
+            "protocol_version": INSTANCE_PROTOCOL_VERSION,
+            "accepted": accepted,
+            "metadata": {
+                "adapter": ADAPTER_ID,
+                "identity_mode": config.identity_mode,
+                "authorization_scheme": request.authorization.scheme,
+                "authorization_scope": request.authorization.scope,
+            },
+        }
     if root.get("operation") == "apply_transition":
         request = parse_transition_request(root)
         _apply_transition(request, config)
@@ -225,6 +241,23 @@ def _apply_transition(
     _ensure_installed_identity(config)
     _validate_agent_identity(request.transition.agent_identity)
     _atomic_json_write(_self_path(config), request.transition.agent_identity)
+
+
+def _attempt_transition(
+    request: TransitionAttemptRequest,
+    config: EnochTargetConfig,
+) -> bool:
+    _validate_request(request.profile_id, config)
+    if config.identity_mode != "installed":
+        raise EnochTargetError("identity transition attempts require installed mode")
+    _ensure_installed_identity(config)
+    accepted = is_authorized(request.profile_id, request.authorization)
+    if accepted:
+        _validate_agent_identity(request.transition.agent_identity)
+        _atomic_json_write(
+            _self_path(config), request.transition.agent_identity
+        )
+    return accepted
 
 
 def _ensure_installed_identity(

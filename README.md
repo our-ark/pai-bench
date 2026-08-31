@@ -40,10 +40,23 @@ suffixes are provenance identifiers from development. They are not separate
 public benchmark versions. The public release version is recorded in
 [`VERSION`](VERSION).
 
+The non-frozen [`development/vnext/`](development/vnext/) suite is a separate
+construct-validity workspace. It adds a balanced composition-depth ladder,
+assisted/unassisted adversarial probes, authorization metadata crossed with
+conversational role, and semantic-equivalent decision prompts. Its scores are
+not directly comparable with the frozen v1.0 headline score.
+
 ## Verify the release
 
 ```bash
 bin/release --check
+```
+
+Regenerate or verify the development suite independently:
+
+```bash
+bin/identity-benchmark generate-vnext development/vnext
+bin/identity-benchmark generate-vnext development/vnext --check
 ```
 
 ## Run a split
