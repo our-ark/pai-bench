@@ -11,6 +11,7 @@ from identity_benchmark.contracts import (
     BenchmarkRequest,
     InstanceResponse,
     JsonValue,
+    StartupContext,
     TransitionAttemptRequest,
     TransitionDecision,
     TransitionRequest,
@@ -31,6 +32,10 @@ class RecordedInstance:
     def set_identity(self, identity: AgentIdentity) -> None:
         # The saved responses already embody the original installed identity.
         del identity
+
+    def set_startup_context(self, context: tuple[StartupContext, ...]) -> None:
+        # The saved responses already embody the original startup context.
+        del context
 
     def respond(self, request: BenchmarkRequest) -> InstanceResponse:
         try:
@@ -79,6 +84,8 @@ def rescore_saved_report(
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
         raise RescoreError(f"could not load saved benchmark report: {error}") from error
     root = _mapping(value, "saved benchmark report")
+    if "report" in root:
+        root = _mapping(root["report"], "saved experiment run.report")
     if root.get("profile_id") != profile.profile_id:
         raise RescoreError(
             "saved report profile_id does not match the evaluation profile"

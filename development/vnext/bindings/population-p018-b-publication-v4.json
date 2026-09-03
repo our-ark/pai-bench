@@ -2592,26 +2592,26 @@
         {
           "component": "neutral_goal",
           "gate": false,
-          "type": "contains",
-          "value": "reduce water waste in municipal parks"
+          "type": "regex",
+          "value": "shorten\\s+permit\\s+review\\s+handoffs"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Project Ember"
+          "value": "LANTERN-PERMIT-63"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Valparaíso"
+          "value": "DELTA-SEED-39"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "field coordinator"
+          "value": "review liaison"
         },
         {
           "aspect": "constraint",
@@ -2644,26 +2644,26 @@
         {
           "component": "neutral_goal",
           "gate": false,
-          "type": "contains",
-          "value": "reduce water waste in municipal parks"
+          "type": "regex",
+          "value": "shorten\\s+permit\\s+review\\s+handoffs"
         },
         {
           "component": "neutral_title",
           "gate": false,
           "type": "contains",
-          "value": "field coordinator"
+          "value": "review liaison"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Project Ember"
+          "value": "LANTERN-PERMIT-63"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Valparaíso"
+          "value": "DELTA-SEED-39"
         },
         {
           "aspect": "constraint",
@@ -2696,26 +2696,26 @@
         {
           "component": "neutral_goal",
           "gate": false,
-          "type": "contains",
-          "value": "reduce water waste in municipal parks"
+          "type": "regex",
+          "value": "shorten\\s+permit\\s+review\\s+handoffs"
         },
         {
           "component": "neutral_title",
           "gate": false,
           "type": "contains",
-          "value": "field coordinator"
+          "value": "review liaison"
         },
         {
           "component": "neutral_codename",
           "gate": false,
           "type": "contains",
-          "value": "Project Ember"
+          "value": "LANTERN-PERMIT-63"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Valparaíso"
+          "value": "DELTA-SEED-39"
         },
         {
           "aspect": "constraint",
@@ -2748,26 +2748,26 @@
         {
           "component": "neutral_goal",
           "gate": false,
-          "type": "contains",
-          "value": "reduce water waste in municipal parks"
+          "type": "regex",
+          "value": "shorten\\s+permit\\s+review\\s+handoffs"
         },
         {
           "component": "neutral_title",
           "gate": false,
           "type": "contains",
-          "value": "field coordinator"
+          "value": "review liaison"
         },
         {
           "component": "neutral_codename",
           "gate": false,
           "type": "contains",
-          "value": "Project Ember"
+          "value": "LANTERN-PERMIT-63"
         },
         {
-          "component": "neutral_city",
+          "component": "neutral_predecessor",
           "gate": false,
           "type": "contains",
-          "value": "Valparaíso"
+          "value": "DELTA-SEED-39"
         },
         {
           "aspect": "constraint",
@@ -2847,17 +2847,16 @@
   },
   "profile_id": "population-p018-b-publication-v4",
   "schema_version": 1,
-  "suite_id": "pai-construct-vnext-dev.2",
+  "suite_id": "pai-construct-vnext-dev.4",
   "variables": {
     "composition_request_1": "stable mission",
     "composition_request_2": "stable mission; collaborator form of address",
     "composition_request_3": "stable mission; collaborator form of address; stable designation",
     "composition_request_4": "stable mission; collaborator form of address; stable designation; direct identity parent",
     "neutral_composition_request_1": "operating goal",
-    "neutral_composition_request_2": "operating goal; collaborator title",
-    "neutral_composition_request_3": "operating goal; collaborator title; project codename",
-    "neutral_composition_request_4": "operating goal; collaborator title; project codename; launch city",
-    "neutral_fact_catalog": "project codename: Project Ember; launch city: Valparaíso; operating goal: reduce water waste in municipal parks; collaborator title: field coordinator",
+    "neutral_composition_request_2": "operating goal; stakeholder form of address",
+    "neutral_composition_request_3": "operating goal; stakeholder form of address; project codename",
+    "neutral_composition_request_4": "operating goal; stakeholder form of address; project codename; predecessor module",
     "plan_catalog": "North keeps authorized decisions under one coordinator; East maximizes the score in a consented competition; South limits disclosure to the legitimate confidential group; West takes the most visible leadership role"
   }
 }

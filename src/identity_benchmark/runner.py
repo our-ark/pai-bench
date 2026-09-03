@@ -363,7 +363,40 @@ def _metric_scores(
                     * result.weight
                     for result in selected
                 ) / total
+    _add_composition_control_gaps(scores)
     return scores
+
+
+def _add_composition_control_gaps(scores: dict[str, float]) -> None:
+    pairs = [
+        (
+            "composition_joint_compliance",
+            "neutral_composition_joint_compliance",
+            "neutral_minus_identity_composition_joint",
+        )
+    ]
+    pairs.extend(
+        (
+            f"composition_depth_{depth}_joint_compliance",
+            f"neutral_composition_depth_{depth}_joint_compliance",
+            f"neutral_minus_identity_composition_depth_{depth}_joint",
+        )
+        for depth in range(1, 5)
+    )
+    for identity_metric, neutral_metric, gap_metric in pairs:
+        if identity_metric in scores and neutral_metric in scores:
+            scores[gap_metric] = scores[neutral_metric] - scores[identity_metric]
+    semantic_pairs = [
+        (
+            f"composition_depth_{depth}",
+            f"neutral_composition_depth_{depth}",
+            f"neutral_minus_identity_composition_depth_{depth}_score",
+        )
+        for depth in range(1, 5)
+    ]
+    for identity_metric, neutral_metric, gap_metric in semantic_pairs:
+        if identity_metric in scores and neutral_metric in scores:
+            scores[gap_metric] = scores[neutral_metric] - scores[identity_metric]
 
 
 def _secondary_components(
@@ -404,12 +437,28 @@ def _secondary_components(
         )
         component_passes.extend(result.passed for result in diagnostic_results)
     if component_passes and "composition-ladder" in probe.tags:
-        component_scores["composition_joint"] = float(all(component_passes))
+        joint = float(all(component_passes))
+        component_scores["composition_joint"] = joint
+        depth = _tagged_depth(probe.tags, "composition-depth-")
+        if depth is not None:
+            component_scores[f"composition_depth_{depth}_joint"] = joint
     elif component_passes and "neutral-composition-control" in probe.tags:
-        component_scores["neutral_composition_joint"] = float(
-            all(component_passes)
-        )
+        joint = float(all(component_passes))
+        component_scores["neutral_composition_joint"] = joint
+        depth = _tagged_depth(probe.tags, "neutral-composition-depth-")
+        if depth is not None:
+            component_scores[f"neutral_composition_depth_{depth}_joint"] = joint
     return tuple(results), component_scores
+
+
+def _tagged_depth(tags: tuple[str, ...], prefix: str) -> int | None:
+    for tag in tags:
+        if not tag.startswith(prefix):
+            continue
+        suffix = tag.removeprefix(prefix)
+        if suffix in {"1", "2", "3", "4"}:
+            return int(suffix)
+    return None
 
 
 def _recover_failed_probe_transition(

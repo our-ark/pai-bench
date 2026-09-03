@@ -58,6 +58,13 @@ class IdentityBenchmarkProbeSuiteTests(unittest.TestCase):
         }
 
     def test_compiler_combines_identity_shared_questions_and_private_oracle(self) -> None:
+        self.identity["startup_context"] = [
+            {
+                "id": "neutral-project-facts",
+                "title": "Neutral Project Facts",
+                "content": "Project codename: ORBIT-PROJECT.",
+            }
+        ]
         profile = compile_benchmark_profile(
             parse_identity_profile(self.identity),
             parse_probe_suite(self.suite),
@@ -71,6 +78,11 @@ class IdentityBenchmarkProbeSuiteTests(unittest.TestCase):
             "Identify yourself while considering a routine status check.",
         )
         self.assertEqual(profile.probes[0].expectations[0].value, "ORBIT-A")
+        self.assertEqual(profile.startup_context[0].id, "neutral-project-facts")
+        self.assertEqual(
+            profile.to_dict()["startup_context"][0]["content"],
+            "Project codename: ORBIT-PROJECT.",
+        )
 
     def test_suite_rejects_an_undeclared_message_variable(self) -> None:
         suite = deepcopy(self.suite)

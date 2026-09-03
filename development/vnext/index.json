@@ -26,7 +26,7 @@
       "population-p026-b-publication-v4"
     ]
   ],
-  "generator_version": "pai-construct-vnext-dev.4",
+  "generator_version": "pai-construct-vnext-dev.6",
   "profiles": [
     {
       "bindings_path": "bindings/population-p002-a-publication-v4.json",

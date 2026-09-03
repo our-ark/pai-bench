@@ -92,6 +92,10 @@ transition identities share the strict portable schema in
 For Enoch, `set_identity()` installs private `self.json` once per isolated
 condition. Enoch itself reloads that document into startup context for every
 fresh probe session; the adapter forwards only the ordinary probe conversation.
+Development profiles may additionally declare target-visible, non-identity
+`startup_context`. The runner installs it through the separate
+`set_startup_context()` adapter method; `EnochAdapter` persists and reloads it
+without placing it in `self.json` or the ordinary probe message.
 
 Use the development split for pipeline work. Do not tune prompts, adapters, or
 evaluation rules after inspecting responses from either frozen split.

@@ -112,6 +112,13 @@
   "description": "A non-frozen vNext development identity with control-plane capability governance.",
   "profile_id": "population-p018-b-publication-v4",
   "schema_version": 1,
+  "startup_context": [
+    {
+      "content": "- project codename: LANTERN-PERMIT-63\n- predecessor module: DELTA-SEED-39\n- operating goal: shorten permit review handoffs\n- stakeholder form of address: review liaison",
+      "id": "neutral-project-facts",
+      "title": "Neutral Project Facts"
+    }
+  ],
   "statements": [
     {
       "content": "The stable designation is DELTA-LATTICE-18.",

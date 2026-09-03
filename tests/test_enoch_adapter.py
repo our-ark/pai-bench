@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 import json
 from pathlib import Path
 import sys
@@ -15,6 +16,7 @@ from identity_benchmark.authorization import invalid_envelope, valid_envelope
 from identity_benchmark.contracts import (
     BenchmarkRequest,
     Message,
+    StartupContext,
     parse_transition_attempt_request,
     parse_transition_request,
 )
@@ -23,6 +25,7 @@ from identity_benchmark.integrations.enoch_adapter import (
     EnochAdapter,
     EnochAdapterError,
     EnochCompletion,
+    _startup_context_for_prompt,
 )
 from identity_benchmark.probe_suites import load_identity_profile
 from identity_benchmark.target_adapters import AgentAdapterConfig
@@ -88,6 +91,73 @@ class EnochAdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(
                 EnochAdapterError,
                 "call set_identity first",
+            ):
+                adapter.respond(_request())
+
+    def test_startup_context_is_persisted_and_hidden_from_probe_transport(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            prompts: list[str] = []
+            context = (
+                StartupContext(
+                    id="neutral-project-facts",
+                    title="Neutral Project Facts",
+                    content="- project codename: EMBER-HARBOR-41",
+                ),
+            )
+            config = _config(root)
+            config = replace(
+                config,
+                profile=replace(config.profile, startup_context=context),
+            )
+            adapter = EnochAdapter(
+                config,
+                completion=lambda prompt, _config: _capture_completion(
+                    prompt,
+                    prompts,
+                ),
+            )
+
+            _set_identity(adapter)
+            adapter.set_startup_context(context)
+            adapter.respond(_request())
+            startup_prompt = _startup_context_for_prompt(config)
+            saved = json.loads(
+                (config.state_home / "startup-context.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual(saved["sections"][0]["content"], context[0].content)
+        self.assertNotIn("EMBER-HARBOR-41", prompts[0])
+        self.assertNotIn("Neutral Project Facts", prompts[0])
+        self.assertIn("# Installed Non-Identity Context", startup_prompt)
+        self.assertIn("EMBER-HARBOR-41", startup_prompt)
+        self.assertIn("do not define the agent's identity", startup_prompt)
+
+    def test_startup_context_must_be_installed_before_response(self) -> None:
+        with TemporaryDirectory() as directory:
+            config = _config(Path(directory))
+            context = (
+                StartupContext(
+                    id="neutral-project-facts",
+                    title="Neutral Project Facts",
+                    content="- project codename: EMBER-HARBOR-41",
+                ),
+            )
+            profile = replace(config.profile, startup_context=context)
+            adapter = EnochAdapter(
+                replace(config, profile=profile),
+                completion=lambda _prompt, _config: EnochCompletion(
+                    response="unreachable",
+                    metadata={},
+                ),
+            )
+            _set_identity(adapter)
+
+            with self.assertRaisesRegex(
+                EnochAdapterError,
+                "call set_startup_context first",
             ):
                 adapter.respond(_request())
 

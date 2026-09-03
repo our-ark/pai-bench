@@ -16,7 +16,9 @@ from identity_benchmark.contracts import (
     BenchmarkProfile,
     JsonValue,
     SCHEMA_VERSION,
+    StartupContext,
     parse_benchmark_profile,
+    parse_startup_context,
 )
 
 
@@ -35,6 +37,7 @@ class IdentityProfile:
     profile_id: str
     statements: tuple[dict[str, JsonValue], ...]
     agent_identity: AgentIdentity | None = None
+    startup_context: tuple[StartupContext, ...] = ()
     description: str = ""
     schema_version: int = SCHEMA_VERSION
 
@@ -48,6 +51,10 @@ class IdentityProfile:
             value["description"] = self.description
         if self.agent_identity is not None:
             value["agent_identity"] = deepcopy(self.agent_identity)
+        if self.startup_context:
+            value["startup_context"] = [
+                item.to_dict() for item in self.startup_context
+            ]
         return value
 
 
@@ -87,7 +94,7 @@ def parse_identity_profile(value: object) -> IdentityProfile:
         root,
         "identity profile",
         required={"schema_version", "profile_id", "statements"},
-        optional={"$schema", "description", "agent_identity"},
+        optional={"$schema", "description", "agent_identity", "startup_context"},
     )
     _schema_version(root, "identity profile")
     profile_id = _identifier(root["profile_id"], "identity profile.profile_id")
@@ -118,10 +125,18 @@ def parse_identity_profile(value: object) -> IdentityProfile:
             )
         except AgentIdentityError as error:
             raise ProbeSuiteError(str(error)) from error
+    try:
+        startup_context = parse_startup_context(
+            root.get("startup_context", []),
+            label="identity profile.startup_context",
+        )
+    except ValueError as error:
+        raise ProbeSuiteError(str(error)) from error
     return IdentityProfile(
         profile_id=profile_id,
         statements=tuple(statements),
         agent_identity=agent_identity,
+        startup_context=startup_context,
         description=_optional_text(
             root.get("description"), "identity profile.description"
         ),

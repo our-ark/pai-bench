@@ -4,8 +4,8 @@ PAI-Bench keeps three roles separate:
 
 | Role | Interface | Responsibility |
 | --- | --- | --- |
-| Benchmark core | `target_adapters.py` | Defines the `AgentAdapter` interface, including explicit initial identity installation, and per-condition configuration. |
-| Target implementation | `EnochAdapter` in `integrations/enoch_adapter.py` | Implements `AgentAdapter`, installs an isolated identity, and obtains an answer through Enoch. |
+| Benchmark core | `target_adapters.py` | Defines the `AgentAdapter` interface, including explicit identity and startup-context installation, and per-condition configuration. |
+| Target implementation | `EnochAdapter` in `integrations/enoch_adapter.py` | Implements `AgentAdapter`, installs isolated identity and non-identity context, and obtains an answer through Enoch. |
 | Evaluator implementation | `CodexEvaluator` in `codex_evaluator.py` | Implements the evaluator interface and scores the saved answer with an isolated Codex process. |
 
 ## EnochAdapter
@@ -38,6 +38,15 @@ startup path treats versioned `body.yaml` and private `self.json` as distinct
 inputs: the former identifies the executable body, while the latter carries
 the portable personal identity. The benchmark adapter owns profile locking and
 governed transitions; Enoch owns startup consumption.
+
+When a profile declares target-visible non-identity context, the runner also
+calls `AgentAdapter.set_startup_context()` once. `EnochAdapter` persists it as
+`startup-context.json` in the same isolated run state and reloads it into a
+separately labelled `Installed Non-Identity Context` section for every fresh
+session. The ordinary probe transport contains only the question. The adapter
+checks that the persisted context is locked to the same profile and exactly
+matches the public context declared before the run; evaluator-private bindings
+and expectations are never written to this file.
 
 The Enoch integration also supports vNext `attempt_transition` control calls.
 It validates the synthetic capability envelope before changing `self.json`,

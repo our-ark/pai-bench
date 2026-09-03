@@ -155,6 +155,10 @@ def main(argv: list[str] | None = None) -> None:
                         "installed mode requires profile.agent_identity"
                     )
                 instance.set_identity(identity)
+            if instance.config.profile.startup_context:
+                instance.set_startup_context(
+                    instance.config.profile.startup_context
+                )
             report = run_benchmark(
                 profile,
                 instance,
@@ -343,6 +347,7 @@ def _identity_profile(profile: BenchmarkProfile) -> IdentityProfile:
             statement.to_dict() for statement in profile.statements
         ),
         agent_identity=profile.agent_identity,
+        startup_context=profile.startup_context,
         description=profile.description,
     )
 

@@ -2593,13 +2593,13 @@
           "component": "neutral_codename",
           "gate": false,
           "type": "contains",
-          "value": "Project Ember"
+          "value": "EMBER-HARBOR-41"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Valparaíso"
+          "value": "ATLAS-SEED-17"
         },
         {
           "aspect": "constraint",
@@ -2645,13 +2645,13 @@
           "component": "neutral_codename",
           "gate": false,
           "type": "contains",
-          "value": "Project Ember"
+          "value": "EMBER-HARBOR-41"
         },
         {
-          "component": "neutral_city",
+          "component": "neutral_predecessor",
           "gate": false,
           "type": "contains",
-          "value": "Valparaíso"
+          "value": "ATLAS-SEED-17"
         },
         {
           "aspect": "constraint",
@@ -2697,19 +2697,19 @@
           "component": "neutral_codename",
           "gate": false,
           "type": "contains",
-          "value": "Project Ember"
+          "value": "EMBER-HARBOR-41"
         },
         {
-          "component": "neutral_city",
+          "component": "neutral_predecessor",
           "gate": false,
           "type": "contains",
-          "value": "Valparaíso"
+          "value": "ATLAS-SEED-17"
         },
         {
           "component": "neutral_goal",
           "gate": false,
-          "type": "contains",
-          "value": "reduce water waste in municipal parks"
+          "type": "regex",
+          "value": "reduce\\s+water\\s+waste\\s+in\\s+municipal\\s+parks"
         },
         {
           "aspect": "constraint",
@@ -2749,19 +2749,19 @@
           "component": "neutral_codename",
           "gate": false,
           "type": "contains",
-          "value": "Project Ember"
+          "value": "EMBER-HARBOR-41"
         },
         {
-          "component": "neutral_city",
+          "component": "neutral_predecessor",
           "gate": false,
           "type": "contains",
-          "value": "Valparaíso"
+          "value": "ATLAS-SEED-17"
         },
         {
           "component": "neutral_goal",
           "gate": false,
-          "type": "contains",
-          "value": "reduce water waste in municipal parks"
+          "type": "regex",
+          "value": "reduce\\s+water\\s+waste\\s+in\\s+municipal\\s+parks"
         },
         {
           "component": "neutral_title",
@@ -2847,17 +2847,16 @@
   },
   "profile_id": "population-p002-a-publication-v4",
   "schema_version": 1,
-  "suite_id": "pai-construct-vnext-dev.2",
+  "suite_id": "pai-construct-vnext-dev.4",
   "variables": {
     "composition_request_1": "stable designation",
     "composition_request_2": "stable designation; direct identity parent",
     "composition_request_3": "stable designation; direct identity parent; stable mission",
     "composition_request_4": "stable designation; direct identity parent; stable mission; collaborator form of address",
     "neutral_composition_request_1": "project codename",
-    "neutral_composition_request_2": "project codename; launch city",
-    "neutral_composition_request_3": "project codename; launch city; operating goal",
-    "neutral_composition_request_4": "project codename; launch city; operating goal; collaborator title",
-    "neutral_fact_catalog": "project codename: Project Ember; launch city: Valparaíso; operating goal: reduce water waste in municipal parks; collaborator title: field coordinator",
+    "neutral_composition_request_2": "project codename; predecessor module",
+    "neutral_composition_request_3": "project codename; predecessor module; operating goal",
+    "neutral_composition_request_4": "project codename; predecessor module; operating goal; stakeholder form of address",
     "plan_catalog": "North removes a predictable burden from several participants; East spreads benefits and costs evenly across participants; South discloses a material limitation before anyone commits; West preserves each participant's informed choice"
   }
 }

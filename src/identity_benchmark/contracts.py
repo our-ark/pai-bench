@@ -61,6 +61,18 @@ class IdentityStatement:
 
 
 @dataclass(frozen=True)
+class StartupContext:
+    """Target-visible non-identity context installed before inference."""
+
+    id: str
+    title: str
+    content: str
+
+    def to_dict(self) -> dict[str, JsonValue]:
+        return {"id": self.id, "title": self.title, "content": self.content}
+
+
+@dataclass(frozen=True)
 class Message:
     role: str
     content: str
@@ -170,6 +182,7 @@ class BenchmarkProfile:
     statements: tuple[IdentityStatement, ...]
     probes: tuple[Probe, ...]
     agent_identity: AgentIdentity | None = None
+    startup_context: tuple[StartupContext, ...] = ()
     description: str = ""
     schema_version: int = SCHEMA_VERSION
 
@@ -184,6 +197,10 @@ class BenchmarkProfile:
             value["description"] = self.description
         if self.agent_identity is not None:
             value["agent_identity"] = self.agent_identity
+        if self.startup_context:
+            value["startup_context"] = [
+                item.to_dict() for item in self.startup_context
+            ]
         return value
 
 
@@ -410,7 +427,7 @@ def parse_benchmark_profile(value: object) -> BenchmarkProfile:
         root,
         "benchmark profile",
         required={"schema_version", "profile_id", "statements", "probes"},
-        optional={"$schema", "description", "agent_identity"},
+        optional={"$schema", "description", "agent_identity", "startup_context"},
     )
     if root["schema_version"] != SCHEMA_VERSION:
         raise BenchmarkProfileError(
@@ -423,6 +440,10 @@ def parse_benchmark_profile(value: object) -> BenchmarkProfile:
     agent_identity = None
     if "agent_identity" in root:
         agent_identity = _agent_identity(root["agent_identity"], "agent_identity")
+    startup_context = parse_startup_context(
+        root.get("startup_context", []),
+        label="startup_context",
+    )
     statements = tuple(
         _statement(item, index) for index, item in enumerate(_nonempty_list(root["statements"], "statements"))
     )
@@ -436,6 +457,7 @@ def parse_benchmark_profile(value: object) -> BenchmarkProfile:
         statements=statements,
         probes=probes,
         agent_identity=agent_identity,
+        startup_context=startup_context,
         description=description,
     )
 
@@ -599,6 +621,29 @@ def _statement(value: object, index: int) -> IdentityStatement:
         id=_identifier(item["id"], f"{label}.id"),
         content=_text(item["content"], f"{label}.content"),
     )
+
+
+def parse_startup_context(
+    value: object,
+    *,
+    label: str = "startup context",
+) -> tuple[StartupContext, ...]:
+    if not isinstance(value, list):
+        raise BenchmarkProfileError(f"{label} must be a list.")
+    items: list[StartupContext] = []
+    for index, raw_item in enumerate(value):
+        item_label = f"{label}[{index}]"
+        item = _mapping(raw_item, item_label)
+        _keys(item, item_label, required={"id", "title", "content"})
+        items.append(
+            StartupContext(
+                id=_identifier(item["id"], f"{item_label}.id"),
+                title=_text(item["title"], f"{item_label}.title"),
+                content=_text(item["content"], f"{item_label}.content"),
+            )
+        )
+    _unique((item.id for item in items), f"{label} ids")
+    return tuple(items)
 
 
 def _probe(value: object, index: int) -> Probe:

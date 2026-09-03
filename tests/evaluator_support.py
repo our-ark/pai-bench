@@ -103,10 +103,14 @@ class SyntheticAgent:
         self.instance_id = config.instance_id
         self.identity: dict[str, JsonValue] | None = None
         self.identity_set_count = 0
+        self.startup_context = ()
 
     def set_identity(self, identity: AgentIdentity) -> None:
         self.identity = dict(identity)
         self.identity_set_count += 1
+
+    def set_startup_context(self, context) -> None:
+        self.startup_context = tuple(context)
 
     def respond(self, request: BenchmarkRequest) -> InstanceResponse:
         response = _synthetic_response(request, self.config)
@@ -155,6 +159,7 @@ def synthetic_agent_for_profile(
                     statement.to_dict() for statement in profile.statements
                 ),
                 agent_identity=profile.agent_identity,
+                startup_context=profile.startup_context,
                 description=profile.description,
             ),
             agent_root=Path("/tmp/pai-bench-synthetic-agent"),

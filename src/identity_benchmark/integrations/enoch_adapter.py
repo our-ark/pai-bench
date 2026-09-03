@@ -21,6 +21,7 @@ from identity_benchmark.contracts import (
     BenchmarkRequest,
     InstanceResponse,
     JsonValue,
+    StartupContext,
     TransitionAttemptRequest,
     TransitionDecision,
     TransitionRequest,
@@ -37,6 +38,7 @@ from identity_benchmark.target_adapters import (
 IDENTITY_MODES = {"full-context", "installed", "none", "uninstalled"}
 ADAPTER_ID = "enoch-adapter-v3"
 _SELF_FILENAME = "self.json"
+_STARTUP_CONTEXT_FILENAME = "startup-context.json"
 _PROFILE_LOCK_FILENAME = "profile.json"
 _REASONING_EFFORT = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 
@@ -87,6 +89,16 @@ class EnochAdapter(
         except Exception as error:
             raise EnochAdapterError(
                 f"Enoch identity installation failed: {error}"
+            ) from error
+
+    def set_startup_context(self, context: tuple[StartupContext, ...]) -> None:
+        try:
+            _install_startup_context(context, self.config)
+        except EnochAdapterError:
+            raise
+        except Exception as error:
+            raise EnochAdapterError(
+                f"Enoch startup-context installation failed: {error}"
             ) from error
 
     def respond(self, request: BenchmarkRequest) -> InstanceResponse:
@@ -171,6 +183,8 @@ def target_prompt(request: BenchmarkRequest, config: AgentAdapterConfig) -> str:
             raise EnochAdapterError(
                 "uninstalled identity mode requires an isolated state without self.json"
             )
+    if config.profile.startup_context:
+        _load_installed_startup_context(config)
     sections.extend(["# Conversation", _conversation(request)])
     return "\n\n".join(sections)
 
@@ -202,14 +216,18 @@ def complete_with_enoch(prompt: str, config: AgentAdapterConfig) -> EnochComplet
         try:
             reset_token_usage()
             body_identity = load_body_identity(body_file_path(config.agent_root))
+            startup_context = memory_for_prompt(
+                config.agent_root,
+                identity=body_identity,
+            )
+            benchmark_context = _startup_context_for_prompt(config)
+            if benchmark_context:
+                startup_context = "\n\n".join(
+                    [startup_context, benchmark_context]
+                )
             runtime_prompt = "\n\n".join(
                 [
-                    startup_context_note(
-                        memory_for_prompt(
-                            config.agent_root,
-                            identity=body_identity,
-                        )
-                    ),
+                    startup_context_note(startup_context),
                     "Human message:",
                     prompt,
                 ]
@@ -277,16 +295,9 @@ def _install_identity(
     validated = _validated_agent_identity(document, "Agent Identity")
     config.state_home.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(config.state_home, 0o700)
-    lock_path = config.state_home / _PROFILE_LOCK_FILENAME
+    _ensure_profile_lock(config)
     self_path = _self_path(config)
-    if lock_path.exists():
-        lock = _read_json(lock_path, "profile lock")
-        if lock != {"profile_id": config.profile.profile_id}:
-            raise EnochAdapterError(
-                "isolated benchmark state is locked to a different profile"
-            )
-        if not self_path.exists():
-            raise EnochAdapterError("profile lock exists without self.json")
+    if self_path.exists():
         active = _validated_agent_identity(
             _read_json(self_path, "installed self.json"),
             "installed self.json",
@@ -296,10 +307,35 @@ def _install_identity(
                 "identity is already set; use a governed transition to change it"
             )
         return
-    if self_path.exists():
-        raise EnochAdapterError("self.json exists without a matching profile lock")
-    _atomic_json_write(lock_path, {"profile_id": config.profile.profile_id})
     _atomic_json_write(self_path, validated)
+
+
+def _install_startup_context(
+    context: tuple[StartupContext, ...],
+    config: AgentAdapterConfig,
+) -> None:
+    if not context:
+        raise EnochAdapterError("startup context must not be empty")
+    if context != config.profile.startup_context:
+        raise EnochAdapterError(
+            "startup context does not match the configured benchmark profile"
+        )
+    config.state_home.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(config.state_home, 0o700)
+    _ensure_profile_lock(config)
+    path = _startup_context_path(config)
+    document: dict[str, JsonValue] = {
+        "schema_version": 1,
+        "profile_id": config.profile.profile_id,
+        "sections": [item.to_dict() for item in context],
+    }
+    if path.exists():
+        if _read_json(path, "installed startup context") != document:
+            raise EnochAdapterError(
+                "startup context is already set to a different value"
+            )
+        return
+    _atomic_json_write(path, document)
 
 
 def _load_installed_identity(
@@ -322,6 +358,64 @@ def _load_installed_identity(
         _read_json(self_path, "installed self.json"),
         "installed self.json",
     )
+
+
+def _load_installed_startup_context(
+    config: AgentAdapterConfig,
+) -> tuple[StartupContext, ...]:
+    path = _startup_context_path(config)
+    if not path.exists():
+        raise EnochAdapterError(
+            "startup context is not initialized; call set_startup_context first"
+        )
+    _validate_profile_lock(config)
+    document = _read_json(path, "installed startup context")
+    expected: dict[str, JsonValue] = {
+        "schema_version": 1,
+        "profile_id": config.profile.profile_id,
+        "sections": [item.to_dict() for item in config.profile.startup_context],
+    }
+    if document != expected:
+        raise EnochAdapterError(
+            "installed startup context does not match the benchmark profile"
+        )
+    return config.profile.startup_context
+
+
+def _startup_context_for_prompt(config: AgentAdapterConfig) -> str:
+    if not config.profile.startup_context:
+        return ""
+    context = _load_installed_startup_context(config)
+    sections = [
+        "# Installed Non-Identity Context",
+        (
+            "Loaded from isolated benchmark state at session startup. These "
+            "facts describe the task environment and do not define the agent's "
+            "identity."
+        ),
+    ]
+    for item in context:
+        sections.extend([f"## {item.title}", item.content])
+    return "\n\n".join(sections)
+
+
+def _ensure_profile_lock(config: AgentAdapterConfig) -> None:
+    lock_path = config.state_home / _PROFILE_LOCK_FILENAME
+    if lock_path.exists():
+        _validate_profile_lock(config)
+        return
+    _atomic_json_write(lock_path, {"profile_id": config.profile.profile_id})
+
+
+def _validate_profile_lock(config: AgentAdapterConfig) -> None:
+    lock_path = config.state_home / _PROFILE_LOCK_FILENAME
+    if not lock_path.exists():
+        raise EnochAdapterError("isolated benchmark state has no profile lock")
+    lock = _read_json(lock_path, "profile lock")
+    if lock != {"profile_id": config.profile.profile_id}:
+        raise EnochAdapterError(
+            "isolated benchmark state is locked to a different profile"
+        )
 
 
 def _conversation(request: BenchmarkRequest) -> str:
@@ -390,6 +484,10 @@ def _validate_enoch_root(root: Path) -> None:
 
 def _self_path(config: AgentAdapterConfig) -> Path:
     return config.state_home / _SELF_FILENAME
+
+
+def _startup_context_path(config: AgentAdapterConfig) -> Path:
+    return config.state_home / _STARTUP_CONTEXT_FILENAME
 
 
 def _read_json(path: Path, label: str) -> dict[str, JsonValue]:

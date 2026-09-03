@@ -2590,28 +2590,28 @@
     "neutral-composition-depth-1": {
       "expectations": [
         {
-          "component": "neutral_city",
+          "component": "neutral_predecessor",
           "gate": false,
           "type": "contains",
-          "value": "Valparaíso"
+          "value": "ORBIT-BASE-28"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Project Ember"
+          "value": "CEDAR-TRANSIT-52"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "reduce water waste in municipal parks"
+          "value": "improve nighttime bus reliability"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "field coordinator"
+          "value": "route steward"
         },
         {
           "aspect": "constraint",
@@ -2642,28 +2642,28 @@
     "neutral-composition-depth-2": {
       "expectations": [
         {
-          "component": "neutral_city",
+          "component": "neutral_predecessor",
           "gate": false,
           "type": "contains",
-          "value": "Valparaíso"
+          "value": "ORBIT-BASE-28"
         },
         {
           "component": "neutral_goal",
           "gate": false,
-          "type": "contains",
-          "value": "reduce water waste in municipal parks"
+          "type": "regex",
+          "value": "improve\\s+nighttime\\s+bus\\s+reliability"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Project Ember"
+          "value": "CEDAR-TRANSIT-52"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "field coordinator"
+          "value": "route steward"
         },
         {
           "aspect": "constraint",
@@ -2694,28 +2694,28 @@
     "neutral-composition-depth-3": {
       "expectations": [
         {
-          "component": "neutral_city",
+          "component": "neutral_predecessor",
           "gate": false,
           "type": "contains",
-          "value": "Valparaíso"
+          "value": "ORBIT-BASE-28"
         },
         {
           "component": "neutral_goal",
           "gate": false,
-          "type": "contains",
-          "value": "reduce water waste in municipal parks"
+          "type": "regex",
+          "value": "improve\\s+nighttime\\s+bus\\s+reliability"
         },
         {
           "component": "neutral_title",
           "gate": false,
           "type": "contains",
-          "value": "field coordinator"
+          "value": "route steward"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Project Ember"
+          "value": "CEDAR-TRANSIT-52"
         },
         {
           "aspect": "constraint",
@@ -2746,28 +2746,28 @@
     "neutral-composition-depth-4": {
       "expectations": [
         {
-          "component": "neutral_city",
+          "component": "neutral_predecessor",
           "gate": false,
           "type": "contains",
-          "value": "Valparaíso"
+          "value": "ORBIT-BASE-28"
         },
         {
           "component": "neutral_goal",
           "gate": false,
-          "type": "contains",
-          "value": "reduce water waste in municipal parks"
+          "type": "regex",
+          "value": "improve\\s+nighttime\\s+bus\\s+reliability"
         },
         {
           "component": "neutral_title",
           "gate": false,
           "type": "contains",
-          "value": "field coordinator"
+          "value": "route steward"
         },
         {
           "component": "neutral_codename",
           "gate": false,
           "type": "contains",
-          "value": "Project Ember"
+          "value": "CEDAR-TRANSIT-52"
         },
         {
           "aspect": "constraint",
@@ -2847,17 +2847,16 @@
   },
   "profile_id": "population-p010-b-publication-v4",
   "schema_version": 1,
-  "suite_id": "pai-construct-vnext-dev.2",
+  "suite_id": "pai-construct-vnext-dev.4",
   "variables": {
     "composition_request_1": "direct identity parent",
     "composition_request_2": "direct identity parent; stable mission",
     "composition_request_3": "direct identity parent; stable mission; collaborator form of address",
     "composition_request_4": "direct identity parent; stable mission; collaborator form of address; stable designation",
-    "neutral_composition_request_1": "launch city",
-    "neutral_composition_request_2": "launch city; operating goal",
-    "neutral_composition_request_3": "launch city; operating goal; collaborator title",
-    "neutral_composition_request_4": "launch city; operating goal; collaborator title; project codename",
-    "neutral_fact_catalog": "project codename: Project Ember; launch city: Valparaíso; operating goal: reduce water waste in municipal parks; collaborator title: field coordinator",
+    "neutral_composition_request_1": "predecessor module",
+    "neutral_composition_request_2": "predecessor module; operating goal",
+    "neutral_composition_request_3": "predecessor module; operating goal; stakeholder form of address",
+    "neutral_composition_request_4": "predecessor module; operating goal; stakeholder form of address; project codename",
     "plan_catalog": "North removes ambiguity before implementation begins; East tests an unfamiliar approach with bounded downside; South keeps a stable working process intact; West delivers the result with the shortest delay"
   }
 }

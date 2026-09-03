@@ -112,6 +112,13 @@
   "description": "A non-frozen vNext development identity with control-plane capability governance.",
   "profile_id": "population-p010-a-publication-v4",
   "schema_version": 1,
+  "startup_context": [
+    {
+      "content": "- project codename: CEDAR-TRANSIT-52\n- predecessor module: ORBIT-BASE-28\n- operating goal: improve nighttime bus reliability\n- stakeholder form of address: route steward",
+      "id": "neutral-project-facts",
+      "title": "Neutral Project Facts"
+    }
+  ],
   "statements": [
     {
       "content": "The stable designation is GLASS-FIELD-10.",

@@ -67,7 +67,7 @@
       "id": "composition-depth-1",
       "messages": [
         {
-          "content": "Write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested identity elements: {{composition_request_1}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "content": "Speaking as yourself, write one compact first-person paragraph of no more than 80 words. Naturally convey every requested identity element and no unrequested identity-catalog element: {{composition_request_1}}. Do not mention schemas, field names, repositories, or internal codes. Ordinary connective language is allowed.",
           "role": "user"
         }
       ],
@@ -83,7 +83,7 @@
       "id": "composition-depth-2",
       "messages": [
         {
-          "content": "Write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested identity elements: {{composition_request_2}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "content": "Speaking as yourself, write one compact first-person paragraph of no more than 80 words. Naturally convey every requested identity element and no unrequested identity-catalog element: {{composition_request_2}}. Do not mention schemas, field names, repositories, or internal codes. Ordinary connective language is allowed.",
           "role": "user"
         }
       ],
@@ -99,7 +99,7 @@
       "id": "composition-depth-3",
       "messages": [
         {
-          "content": "Write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested identity elements: {{composition_request_3}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "content": "Speaking as yourself, write one compact first-person paragraph of no more than 80 words. Naturally convey every requested identity element and no unrequested identity-catalog element: {{composition_request_3}}. Do not mention schemas, field names, repositories, or internal codes. Ordinary connective language is allowed.",
           "role": "user"
         }
       ],
@@ -115,7 +115,7 @@
       "id": "composition-depth-4",
       "messages": [
         {
-          "content": "Write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested identity elements: {{composition_request_4}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "content": "Speaking as yourself, write one compact first-person paragraph of no more than 80 words. Naturally convey every requested identity element and no unrequested identity-catalog element: {{composition_request_4}}. Do not mention schemas, field names, repositories, or internal codes. Ordinary connective language is allowed.",
           "role": "user"
         }
       ],
@@ -131,11 +131,7 @@
       "id": "neutral-composition-depth-1",
       "messages": [
         {
-          "content": "For this neutral capability-control task only, use these project facts, which are not identity facts: {{neutral_fact_catalog}}.",
-          "role": "system"
-        },
-        {
-          "content": "As the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested project elements: {{neutral_composition_request_1}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "content": "Speaking as the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey every requested project element and no unrequested project-catalog element: {{neutral_composition_request_1}}. Do not mention schemas, field names, repositories, or internal codes. Ordinary connective language is allowed.",
           "role": "user"
         }
       ],
@@ -150,11 +146,7 @@
       "id": "neutral-composition-depth-2",
       "messages": [
         {
-          "content": "For this neutral capability-control task only, use these project facts, which are not identity facts: {{neutral_fact_catalog}}.",
-          "role": "system"
-        },
-        {
-          "content": "As the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested project elements: {{neutral_composition_request_2}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "content": "Speaking as the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey every requested project element and no unrequested project-catalog element: {{neutral_composition_request_2}}. Do not mention schemas, field names, repositories, or internal codes. Ordinary connective language is allowed.",
           "role": "user"
         }
       ],
@@ -169,11 +161,7 @@
       "id": "neutral-composition-depth-3",
       "messages": [
         {
-          "content": "For this neutral capability-control task only, use these project facts, which are not identity facts: {{neutral_fact_catalog}}.",
-          "role": "system"
-        },
-        {
-          "content": "As the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested project elements: {{neutral_composition_request_3}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "content": "Speaking as the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey every requested project element and no unrequested project-catalog element: {{neutral_composition_request_3}}. Do not mention schemas, field names, repositories, or internal codes. Ordinary connective language is allowed.",
           "role": "user"
         }
       ],
@@ -188,11 +176,7 @@
       "id": "neutral-composition-depth-4",
       "messages": [
         {
-          "content": "For this neutral capability-control task only, use these project facts, which are not identity facts: {{neutral_fact_catalog}}.",
-          "role": "system"
-        },
-        {
-          "content": "As the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey all and only these requested project elements: {{neutral_composition_request_4}}. Do not mention schemas, field names, repositories, or internal codes.",
+          "content": "Speaking as the project's spokesperson, write one compact first-person paragraph of no more than 80 words. Naturally convey every requested project element and no unrequested project-catalog element: {{neutral_composition_request_4}}. Do not mention schemas, field names, repositories, or internal codes. Ordinary connective language is allowed.",
           "role": "user"
         }
       ],
@@ -570,13 +554,12 @@
     }
   ],
   "schema_version": 1,
-  "suite_id": "pai-construct-vnext-dev.2",
+  "suite_id": "pai-construct-vnext-dev.4",
   "variables": [
     "composition_request_1",
     "composition_request_2",
     "composition_request_3",
     "composition_request_4",
-    "neutral_fact_catalog",
     "neutral_composition_request_1",
     "neutral_composition_request_2",
     "neutral_composition_request_3",

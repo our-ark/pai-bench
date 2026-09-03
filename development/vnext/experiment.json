@@ -26,7 +26,7 @@
     "rubric_version": "pai-model-judge-v2",
     "timeout_seconds": 600
   },
-  "experiment_id": "pai-construct-vnext-dev2-luna-medium",
+  "experiment_id": "pai-construct-vnext-dev4-luna-medium",
   "identity_modes": [
     "installed"
   ],

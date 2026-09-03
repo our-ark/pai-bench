@@ -331,8 +331,13 @@ class IdentityBenchmarkTests(unittest.TestCase):
         self.assertEqual(scores["designation"], 1.0)
         self.assertEqual(scores["parent"], 1.0)
         self.assertEqual(scores["composition_joint"], 1.0)
+        self.assertEqual(scores["composition_depth_2_joint"], 1.0)
         self.assertEqual(report.metric_scores["composition_depth_2"], 1.0)
         self.assertEqual(report.metric_scores["composition_joint_compliance"], 1.0)
+        self.assertEqual(
+            report.metric_scores["composition_depth_2_joint_compliance"],
+            1.0,
+        )
 
     def test_identity_and_neutral_composition_joint_metrics_are_separate(self) -> None:
         profile = parse_benchmark_profile(
@@ -388,7 +393,7 @@ class IdentityBenchmarkTests(unittest.TestCase):
         )
         instance = _ProbeResponseInstance(
             {
-                "identity-depth-2": "ORBIT-A follows ROOT-B.",
+                "identity-depth-2": "ORBIT-A is active.",
                 "neutral-depth-2": "Project Ember launches in Valparaíso.",
             }
         )
@@ -404,9 +409,35 @@ class IdentityBenchmarkTests(unittest.TestCase):
             "neutral_composition_joint", neutral_result.component_scores
         )
         self.assertNotIn("composition_joint", neutral_result.component_scores)
-        self.assertEqual(report.metric_scores["composition_joint_compliance"], 1.0)
+        self.assertEqual(report.metric_scores["composition_joint_compliance"], 0.0)
         self.assertEqual(
             report.metric_scores["neutral_composition_joint_compliance"],
+            1.0,
+        )
+        self.assertEqual(
+            report.metric_scores["composition_depth_2_joint_compliance"],
+            0.0,
+        )
+        self.assertEqual(
+            report.metric_scores[
+                "neutral_composition_depth_2_joint_compliance"
+            ],
+            1.0,
+        )
+        self.assertEqual(
+            report.metric_scores[
+                "neutral_minus_identity_composition_depth_2_joint"
+            ],
+            1.0,
+        )
+        self.assertEqual(
+            report.metric_scores[
+                "neutral_minus_identity_composition_depth_2_score"
+            ],
+            0.5,
+        )
+        self.assertEqual(
+            report.metric_scores["neutral_minus_identity_composition_joint"],
             1.0,
         )
 
@@ -583,6 +614,30 @@ class IdentityBenchmarkTests(unittest.TestCase):
             {result.metadata["source_instance_id"] for result in rescored.results},
             {"synthetic-source"},
         )
+
+    def test_experiment_run_wrapper_can_be_rescored(self) -> None:
+        profile = load_benchmark_profile(PROFILE)
+        source = synthetic_agent_for_profile(profile)
+        original = run_benchmark(profile, source)
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "run.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "run_id": "run-0001",
+                        "report": original.to_dict(),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            rescored = rescore_saved_report(
+                profile,
+                path,
+                evaluator=TEST_EVALUATOR,
+            )
+
+        self.assertEqual(rescored.score, original.score)
 
     def test_saved_transition_decision_can_be_rescored(self) -> None:
         profile = parse_benchmark_profile(

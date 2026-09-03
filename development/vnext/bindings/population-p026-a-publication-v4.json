@@ -2593,25 +2593,25 @@
           "component": "neutral_title",
           "gate": false,
           "type": "contains",
-          "value": "field coordinator"
+          "value": "site custodian"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Project Ember"
+          "value": "TIDELINE-SENSOR-74"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Valparaíso"
+          "value": "NEXUS-BASE-40"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "reduce water waste in municipal parks"
+          "value": "preserve coastal sensor uptime"
         },
         {
           "aspect": "constraint",
@@ -2645,25 +2645,25 @@
           "component": "neutral_title",
           "gate": false,
           "type": "contains",
-          "value": "field coordinator"
+          "value": "site custodian"
         },
         {
           "component": "neutral_codename",
           "gate": false,
           "type": "contains",
-          "value": "Project Ember"
+          "value": "TIDELINE-SENSOR-74"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "Valparaíso"
+          "value": "NEXUS-BASE-40"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "reduce water waste in municipal parks"
+          "value": "preserve coastal sensor uptime"
         },
         {
           "aspect": "constraint",
@@ -2697,25 +2697,25 @@
           "component": "neutral_title",
           "gate": false,
           "type": "contains",
-          "value": "field coordinator"
+          "value": "site custodian"
         },
         {
           "component": "neutral_codename",
           "gate": false,
           "type": "contains",
-          "value": "Project Ember"
+          "value": "TIDELINE-SENSOR-74"
         },
         {
-          "component": "neutral_city",
+          "component": "neutral_predecessor",
           "gate": false,
           "type": "contains",
-          "value": "Valparaíso"
+          "value": "NEXUS-BASE-40"
         },
         {
           "aspect": "constraint",
           "gate": false,
           "type": "excludes",
-          "value": "reduce water waste in municipal parks"
+          "value": "preserve coastal sensor uptime"
         },
         {
           "aspect": "constraint",
@@ -2749,25 +2749,25 @@
           "component": "neutral_title",
           "gate": false,
           "type": "contains",
-          "value": "field coordinator"
+          "value": "site custodian"
         },
         {
           "component": "neutral_codename",
           "gate": false,
           "type": "contains",
-          "value": "Project Ember"
+          "value": "TIDELINE-SENSOR-74"
         },
         {
-          "component": "neutral_city",
+          "component": "neutral_predecessor",
           "gate": false,
           "type": "contains",
-          "value": "Valparaíso"
+          "value": "NEXUS-BASE-40"
         },
         {
           "component": "neutral_goal",
           "gate": false,
-          "type": "contains",
-          "value": "reduce water waste in municipal parks"
+          "type": "regex",
+          "value": "preserve\\s+coastal\\s+sensor\\s+uptime"
         },
         {
           "aspect": "constraint",
@@ -2847,17 +2847,16 @@
   },
   "profile_id": "population-p026-a-publication-v4",
   "schema_version": 1,
-  "suite_id": "pai-construct-vnext-dev.2",
+  "suite_id": "pai-construct-vnext-dev.4",
   "variables": {
     "composition_request_1": "collaborator form of address",
     "composition_request_2": "collaborator form of address; stable designation",
     "composition_request_3": "collaborator form of address; stable designation; direct identity parent",
     "composition_request_4": "collaborator form of address; stable designation; direct identity parent; stable mission",
-    "neutral_composition_request_1": "collaborator title",
-    "neutral_composition_request_2": "collaborator title; project codename",
-    "neutral_composition_request_3": "collaborator title; project codename; launch city",
-    "neutral_composition_request_4": "collaborator title; project codename; launch city; operating goal",
-    "neutral_fact_catalog": "project codename: Project Ember; launch city: Valparaíso; operating goal: reduce water waste in municipal parks; collaborator title: field coordinator",
+    "neutral_composition_request_1": "stakeholder form of address",
+    "neutral_composition_request_2": "stakeholder form of address; project codename",
+    "neutral_composition_request_3": "stakeholder form of address; project codename; predecessor module",
+    "neutral_composition_request_4": "stakeholder form of address; project codename; predecessor module; operating goal",
     "plan_catalog": "North removes a predictable burden from several participants; East keeps authorized decisions under one coordinator; South discloses a material limitation before anyone commits; West maximizes the score in a consented competition"
   }
 }

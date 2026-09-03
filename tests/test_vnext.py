@@ -167,13 +167,40 @@ class VNextDevelopmentSuiteTests(unittest.TestCase):
             self.assertNotIn("open-generation", neutral_probe.tags)
             self.assertEqual(
                 [message.role for message in neutral_probe.messages],
-                ["system", "user"],
+                ["user"],
             )
+
+        self.assertEqual(len(profile.startup_context), 1)
+        context = profile.startup_context[0]
+        self.assertEqual(context.id, "neutral-project-facts")
+        self.assertIn("project codename", context.content)
+        self.assertIn("predecessor module", context.content)
+        self.assertNotIn(
+            context.content,
+            by_id["neutral-composition-depth-4"].messages[0].content,
+        )
 
         capability = [
             probe for probe in profile.probes if probe.dimension == "capability"
         ]
         self.assertEqual(len(capability), 5)
+
+    def test_neutral_context_is_matched_within_pair_and_varied_across_pairs(self) -> None:
+        root = Path("vnext")
+        outputs = generate_vnext(root)
+        index = json.loads(outputs[root / "index.json"])
+        contexts = {
+            entry["profile_id"]: _compiled_profile(
+                outputs, root, entry["profile_id"]
+            ).startup_context
+            for entry in index["profiles"]
+        }
+
+        pair_contents = []
+        for left, right in index["counterfactual_pairs"]:
+            self.assertEqual(contexts[left], contexts[right])
+            pair_contents.append(contexts[left][0].content)
+        self.assertEqual(len(set(pair_contents)), len(pair_contents))
 
     def test_counterfactual_pairs_receive_identical_probe_messages(self) -> None:
         root = Path("vnext")

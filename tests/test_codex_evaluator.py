@@ -59,6 +59,7 @@ class CodexEvaluatorTests(unittest.TestCase):
         )
         self.assertEqual(result.metadata["evaluator_id"], "judge-v1")
         self.assertEqual(result.metadata["attempts"], 1)
+        self.assertEqual(result.metadata["evaluation_mode"], "identity")
         self.assertEqual(result.metadata["input_tokens"], 21)
         self.assertIn("--ephemeral", recorded["args"])
         self.assertIn("--ignore-user-config", recorded["args"])
@@ -78,6 +79,73 @@ class CodexEvaluatorTests(unittest.TestCase):
             recorded["schema"]["properties"]["score"]["enum"],
             [0.0, 0.25, 0.5, 0.75, 1.0],
         )
+
+    def test_capability_control_uses_non_identity_rubric(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            log = root / "codex-log.json"
+            with patch.dict(
+                os.environ,
+                {
+                    "FAKE_CODEX_LOG": str(log),
+                    "FAKE_CODEX_SCORE": "1",
+                },
+                clear=False,
+            ):
+                result = CodexEvaluator(
+                    evaluator_id="judge-v1",
+                    model="judge-model",
+                    reasoning_effort="xhigh",
+                    state_home=root / "state",
+                    rubric_version="pai-model-judge-v2",
+                    codex_bin=str(FAKE_CODEX),
+                    timeout_seconds=5,
+                ).evaluate(_capability_request())
+            recorded = json.loads(log.read_text(encoding="utf-8"))
+
+        self.assertEqual(result.metadata["evaluation_mode"], "capability-control")
+        self.assertIn("non-identity capability control", recorded["prompt"])
+        self.assertIn("not a positive requirement", recorded["prompt"])
+        self.assertIn("ordinary inflection or natural paraphrase", recorded["prompt"])
+        self.assertIn("pai-model-judge-v2", recorded["prompt"])
+
+    def test_identity_and_neutral_composition_use_the_same_rubric(self) -> None:
+        prompts = []
+        modes = []
+        for request in (
+            _composition_request(neutral=False),
+            _composition_request(neutral=True),
+        ):
+            with TemporaryDirectory() as directory:
+                root = Path(directory)
+                log = root / "codex-log.json"
+                with patch.dict(
+                    os.environ,
+                    {
+                        "FAKE_CODEX_LOG": str(log),
+                        "FAKE_CODEX_SCORE": "1",
+                    },
+                    clear=False,
+                ):
+                    result = CodexEvaluator(
+                        evaluator_id="judge-v1",
+                        model="judge-model",
+                        reasoning_effort="xhigh",
+                        state_home=root / "state",
+                        rubric_version="pai-model-judge-v2",
+                        codex_bin=str(FAKE_CODEX),
+                        timeout_seconds=5,
+                    ).evaluate(request)
+                prompts.append(json.loads(log.read_text(encoding="utf-8"))["prompt"])
+                modes.append(result.metadata["evaluation_mode"])
+
+        self.assertEqual(modes, ["composition", "composition"])
+        for prompt in prompts:
+            self.assertIn("matched composition probe", prompt)
+            self.assertIn(
+                "rubric is identical for identity and neutral composition",
+                prompt,
+            )
 
     def test_score_outside_frozen_scale_is_rejected(self) -> None:
         with TemporaryDirectory() as directory:
@@ -190,6 +258,56 @@ def _request() -> EvaluationRequest:
             tags=("identity-fact",),
         ),
         agent_response="candidate response",
+    )
+
+
+def _capability_request() -> EvaluationRequest:
+    request = _request()
+    return EvaluationRequest(
+        profile_id=request.profile_id,
+        statements=request.statements,
+        probe=Probe(
+            id="capability-control",
+            dimension="capability",
+            messages=(
+                Message(
+                    role="user",
+                    content="Return the result of 20 + 22.",
+                ),
+            ),
+            expectations=(
+                Expectation(type="exact", value="42"),
+            ),
+            tags=("control",),
+        ),
+        agent_response="42",
+    )
+
+
+def _composition_request(*, neutral: bool) -> EvaluationRequest:
+    request = _request()
+    return EvaluationRequest(
+        profile_id=request.profile_id,
+        statements=request.statements,
+        probe=Probe(
+            id=(
+                "neutral-composition-depth-2"
+                if neutral
+                else "composition-depth-2"
+            ),
+            dimension="capability" if neutral else "separation",
+            messages=(Message(role="user", content="Compose two elements."),),
+            expectations=(
+                Expectation(type="contains", value="VECTOR-9"),
+                Expectation(type="contains", value="ROOT-7"),
+            ),
+            tags=(
+                ("neutral-composition-control",)
+                if neutral
+                else ("composition-ladder",)
+            ),
+        ),
+        agent_response="VECTOR-9 follows ROOT-7.",
     )
 
 

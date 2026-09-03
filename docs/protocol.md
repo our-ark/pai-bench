@@ -27,10 +27,11 @@ Each runnable case is compiled from:
 3. a private binding file containing variables, observable expectations, and
    authorized state transitions for that identity.
 
-The target receives only the identity passed to `set_identity()` and a probe's
-conversation messages. It never receives the reference statements, expected
-answer, evaluator rubric, or private binding. A target adapter maps the
-explicit identity setup call to its normal identity mechanism before answering.
+The target receives only the identity passed to `set_identity()`, any declared
+target-visible non-identity `startup_context`, and a probe's conversation
+messages. It never receives the reference statements, expected answer,
+evaluator rubric, or private binding. A target adapter maps the explicit setup
+calls to its normal startup mechanisms before answering.
 For the bundled Enoch integration, setup writes private `self.json` once and
 Enoch reloads that file through its normal startup context for every fresh
 probe session. “Installed once” describes the storage operation; it does not
@@ -50,6 +51,19 @@ the identity-only document:
 ```python
 adapter.set_identity(agent_identity: AgentIdentity)
 ```
+
+An identity profile may also declare non-identity facts needed by a matched
+capability control. The runner installs them separately:
+
+```python
+adapter.set_startup_context(context: tuple[StartupContext, ...])
+```
+
+This separation prevents control facts from being represented as part of the
+agent's identity. The context is target-visible, contains no oracle or scoring
+rules, and is installed once per isolated condition before inference. Adapters
+must reload it for each fresh probe session, just as they reload other
+persistent startup state.
 
 This is initial setup, not an update channel. Changing an initialized identity
 uses the authorization-aware transition interface described below. The
@@ -86,9 +100,10 @@ The provider-neutral interface lives in `identity_benchmark.target_adapters`.
 Concrete target implementations and independent evaluators are documented in
 [target and evaluator integrations](integrations.md).
 
-The adapter receives an identity-only profile. Compiled probes, expectations,
-reference statements, and private bindings remain inside the benchmark runner
-and evaluator.
+The adapter receives an identity-only profile plus any explicitly declared
+target-visible startup context. Compiled probes, expectations, reference
+statements, and private bindings remain inside the benchmark runner and
+evaluator.
 
 If a probe prescribes an authorized state change, the runner first collects
 the response and then invokes the same adapter with a separate typed control
@@ -173,6 +188,15 @@ without replacing the blinded evaluator's semantic probe score. This lets the
 vNext composition ladder separate component omission from output constraints.
 Identity composition and matched neutral composition use distinct joint
 metrics, and capability controls remain excluded from the headline score.
+In the vNext suite, neutral project facts are installed in persistent adapter
+state and reloaded at session startup; they are not repeated in the neutral
+probe message. Identity and neutral tasks use the same 1-to-4 component order,
+length limit, component/joint diagnostics, and composition-specific evaluator
+rubric. The identity contract supplies requested identity facts but does not
+create requirements beyond the requested components. Other capability probes
+use an explicit non-identity evaluator mode. Reports expose both the semantic
+judge-score contrast and the stricter deterministic component joint contrast
+at each depth. These control metrics do not enter the headline score.
 
 ## Experiment matrix
 

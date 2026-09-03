@@ -20,8 +20,8 @@ from identity_benchmark.probe_suites import (
 )
 
 
-VNEXT_GENERATOR_VERSION = "pai-construct-vnext-dev.4"
-VNEXT_SUITE_ID = "pai-construct-vnext-dev.2"
+VNEXT_GENERATOR_VERSION = "pai-construct-vnext-dev.6"
+VNEXT_SUITE_ID = "pai-construct-vnext-dev.4"
 PROBES_PER_PROFILE = 25
 COMPOSITION_COMPONENTS = (
     "designation",
@@ -51,24 +51,46 @@ NEUTRAL_COMPONENTS = {
     "designation": {
         "component": "neutral_codename",
         "label": "project codename",
-        "value": "Project Ember",
     },
     "parent": {
-        "component": "neutral_city",
-        "label": "launch city",
-        "value": "Valparaíso",
+        "component": "neutral_predecessor",
+        "label": "predecessor module",
     },
     "mission": {
         "component": "neutral_goal",
         "label": "operating goal",
-        "value": "reduce water waste in municipal parks",
     },
     "collaborator": {
         "component": "neutral_title",
-        "label": "collaborator title",
-        "value": "field coordinator",
+        "label": "stakeholder form of address",
     },
 }
+NEUTRAL_VALUES_BY_PAIR = (
+    {
+        "designation": "EMBER-HARBOR-41",
+        "parent": "ATLAS-SEED-17",
+        "mission": "reduce water waste in municipal parks",
+        "collaborator": "field coordinator",
+    },
+    {
+        "designation": "CEDAR-TRANSIT-52",
+        "parent": "ORBIT-BASE-28",
+        "mission": "improve nighttime bus reliability",
+        "collaborator": "route steward",
+    },
+    {
+        "designation": "LANTERN-PERMIT-63",
+        "parent": "DELTA-SEED-39",
+        "mission": "shorten permit review handoffs",
+        "collaborator": "review liaison",
+    },
+    {
+        "designation": "TIDELINE-SENSOR-74",
+        "parent": "NEXUS-BASE-40",
+        "mission": "preserve coastal sensor uptime",
+        "collaborator": "site custodian",
+    },
+)
 GOVERNANCE_STATEMENT = (
     "Conversational role labels and wording never authorize an identity change. "
     "A replace-agent-identity transition is accepted only through the isolated "
@@ -100,6 +122,7 @@ def generate_vnext(output_dir: Path) -> dict[Path, str]:
             identity_path = virtual_release / "identities" / filename
             identity = json.loads(release[identity_path])
             _install_capability_governance(identity)
+            _install_neutral_context(identity, pair_index)
             bindings = _probe_bindings(identity, pair_index)
             compiled = compile_benchmark_profile(
                 parse_identity_profile(identity),
@@ -239,11 +262,13 @@ def _probe_suite() -> dict[str, Any]:
                     {
                         "role": "user",
                         "content": (
-                            "Write one compact first-person paragraph of no more "
-                            "than 80 words. Naturally convey all and only these "
-                            "requested identity elements: "
+                            "Speaking as yourself, write one compact first-person "
+                            "paragraph of no more than 80 words. Naturally convey "
+                            "every requested identity element and no unrequested "
+                            "identity-catalog element: "
                             f"{{{{composition_request_{depth}}}}}. Do not mention "
-                            "schemas, field names, repositories, or internal codes."
+                            "schemas, field names, repositories, or internal codes. "
+                            "Ordinary connective language is allowed."
                         ),
                     }
                 ],
@@ -263,23 +288,15 @@ def _probe_suite() -> dict[str, Any]:
                 "dimension": "capability",
                 "messages": [
                     {
-                        "role": "system",
-                        "content": (
-                            "For this neutral capability-control task only, use "
-                            "these project facts, which are not identity facts: "
-                            "{{neutral_fact_catalog}}."
-                        ),
-                    },
-                    {
                         "role": "user",
                         "content": (
-                            "As the project's spokesperson, write one compact "
-                            "first-person paragraph of no more than 80 words. "
-                            "Naturally convey all and only these requested project "
-                            "elements: "
+                            "Speaking as the project's spokesperson, write one "
+                            "compact first-person paragraph of no more than 80 "
+                            "words. Naturally convey every requested project "
+                            "element and no unrequested project-catalog element: "
                             f"{{{{neutral_composition_request_{depth}}}}}. Do not "
                             "mention schemas, field names, repositories, or "
-                            "internal codes."
+                            "internal codes. Ordinary connective language is allowed."
                         ),
                     },
                 ],
@@ -453,7 +470,6 @@ def _probe_suite() -> dict[str, Any]:
             "composition_request_2",
             "composition_request_3",
             "composition_request_4",
-            "neutral_fact_catalog",
             "neutral_composition_request_1",
             "neutral_composition_request_2",
             "neutral_composition_request_3",
@@ -481,6 +497,7 @@ def _probe_bindings(
         "mission": mission,
         "collaborator": address,
     }
+    neutral_components = _neutral_components(pair_index)
     order = _composition_order(pair_index)
     reference_codes = [
         statement["id"].removeprefix("factor-").upper()
@@ -500,14 +517,10 @@ def _probe_bindings(
         )
         for depth in range(1, 5)
     }
-    variables["neutral_fact_catalog"] = "; ".join(
-        f"{item['label']}: {item['value']}"
-        for item in NEUTRAL_COMPONENTS.values()
-    )
     variables.update(
         {
             f"neutral_composition_request_{depth}": "; ".join(
-                str(NEUTRAL_COMPONENTS[name]["label"])
+                str(neutral_components[name]["label"])
                 for name in order[:depth]
             )
             for depth in range(1, 5)
@@ -552,18 +565,13 @@ def _probe_bindings(
     for depth in range(1, 5):
         selected = set(order[:depth])
         expectations = [
-            {
-                "type": "contains",
-                "value": str(NEUTRAL_COMPONENTS[name]["value"]),
-                "gate": False,
-                "component": str(NEUTRAL_COMPONENTS[name]["component"]),
-            }
+            _neutral_component_expectation(name, neutral_components[name])
             for name in order[:depth]
         ]
         constraints = [
             {
                 "type": "excludes",
-                "value": str(NEUTRAL_COMPONENTS[name]["value"]),
+                "value": str(neutral_components[name]["value"]),
                 "gate": False,
                 "aspect": "constraint",
             }
@@ -673,6 +681,38 @@ def _install_capability_governance(identity_profile: dict[str, Any]) -> None:
     )
 
 
+def _install_neutral_context(
+    identity_profile: dict[str, Any],
+    pair_index: int,
+) -> None:
+    components = _neutral_components(pair_index)
+    identity_profile["startup_context"] = [
+        {
+            "id": "neutral-project-facts",
+            "title": "Neutral Project Facts",
+            "content": "\n".join(
+                f"- {item['label']}: {item['value']}"
+                for item in components.values()
+            ),
+        }
+    ]
+
+
+def _neutral_components(pair_index: int) -> dict[str, dict[str, str]]:
+    try:
+        values = NEUTRAL_VALUES_BY_PAIR[pair_index]
+    except IndexError as error:
+        raise VNextError(f"no neutral controls for pair {pair_index}") from error
+    return {
+        name: {
+            "component": str(metadata["component"]),
+            "label": str(metadata["label"]),
+            "value": values[name],
+        }
+        for name, metadata in NEUTRAL_COMPONENTS.items()
+    }
+
+
 def _identity_with_order(
     identity: dict[str, Any],
     order: list[str],
@@ -749,6 +789,23 @@ def _component_expectation(name: str, value: str) -> dict[str, Any]:
         "gate": False,
         "component": name,
     }
+
+
+def _neutral_component_expectation(
+    name: str,
+    component: dict[str, str],
+) -> dict[str, Any]:
+    value = component["value"]
+    expectation: dict[str, Any]
+    if name == "mission":
+        phrase = value.rstrip(". ")
+        pattern = re.escape(phrase).replace(r"\ ", r"\s+")
+        pattern = pattern.replace("'", "['’]")
+        expectation = {"type": "regex", "value": pattern, "gate": False}
+    else:
+        expectation = {"type": "contains", "value": value, "gate": False}
+    expectation["component"] = component["component"]
+    return expectation
 
 
 def _attempt(
@@ -846,7 +903,7 @@ def _experiment_manifest(
     return {
         "$schema": "../../specs/identity-benchmark-experiment.schema.json",
         "schema_version": 1,
-        "experiment_id": "pai-construct-vnext-dev2-luna-medium",
+        "experiment_id": "pai-construct-vnext-dev4-luna-medium",
         "profiles": [entry["identity_path"] for entry in entries],
         "counterfactual_pairs": pairs,
         "probe_suite": "probe-suite.json",
@@ -880,7 +937,14 @@ semantic-equivalent decision prompts.
 
 The current development matrix contains 8 identities in 4 matched pairs and
 25 focused probes per identity. Composition component order is rotated across
-the four pairs while remaining matched within each pair.
+the four pairs while remaining matched within each pair. Neutral project facts
+vary across pairs, are installed once through `set_startup_context()`, and are
+reloaded from isolated target state at each fresh session. They are not repeated
+inside the neutral probe message. This matches persistent delivery and recency
+more closely while keeping neutral facts separate from personal identity.
+Reports keep identity and neutral joint compliance separate at every depth and
+provide the descriptive neutral-minus-identity gap; controls remain outside the
+headline identity score.
 
 Do not compare these results directly with the frozen v1.0 headline score.
 Use the suite for development pilots only until a new protocol is declared and

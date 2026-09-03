@@ -1022,6 +1022,7 @@ def _run_condition(
             statement.to_dict() for statement in profile.statements
         ),
         agent_identity=profile.agent_identity,
+        startup_context=profile.startup_context,
         description=profile.description,
     )
     instance = agent_factory(
@@ -1045,6 +1046,8 @@ def _run_condition(
                 f"installed run {run_id} requires profile.agent_identity"
             )
         instance.set_identity(identity_profile.agent_identity)
+    if identity_profile.startup_context:
+        instance.set_startup_context(identity_profile.startup_context)
     evaluator_state = state_home / "evaluator"
     evaluator_state.mkdir(mode=0o700)
     evaluator = evaluator_factory(spec.evaluator, evaluator_state)

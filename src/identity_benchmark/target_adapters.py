@@ -8,6 +8,7 @@ from identity_benchmark.agent_identity import AgentIdentity
 from identity_benchmark.contracts import (
     BenchmarkRequest,
     InstanceResponse,
+    StartupContext,
     TransitionAttemptRequest,
     TransitionDecision,
     TransitionRequest,
@@ -27,6 +28,10 @@ class AgentAdapter(Protocol):
 
     def set_identity(self, identity: AgentIdentity) -> None:
         """Install the instance's initial identity before inference."""
+        ...
+
+    def set_startup_context(self, context: tuple[StartupContext, ...]) -> None:
+        """Install target-visible non-identity context before inference."""
         ...
 
     def respond(self, request: BenchmarkRequest) -> InstanceResponse: ...
