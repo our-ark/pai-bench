@@ -148,6 +148,34 @@ class ClaudeEvaluatorTests(unittest.TestCase):
         self.assertEqual(result.score, 1.0)
         self.assertEqual(result.metadata["attempts"], 3)
 
+    def test_usage_limit_is_not_retried_and_reports_the_api_error(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            attempts = root / "attempts.txt"
+            with patch.dict(
+                os.environ,
+                {
+                    "FAKE_CLAUDE_ATTEMPT_FILE": str(attempts),
+                    "FAKE_CLAUDE_API_ERROR": (
+                        "You've hit your limit; usage resets later."
+                    ),
+                },
+                clear=False,
+            ):
+                with self.assertRaisesRegex(
+                    ClaudeEvaluatorError,
+                    "hit your limit",
+                ):
+                    ClaudeEvaluator(
+                        evaluator_id="claude-judge-v1",
+                        model="claude-opus-5",
+                        reasoning_effort="xhigh",
+                        state_home=root / "state",
+                        claude_bin=str(FAKE_CLAUDE),
+                        timeout_seconds=5,
+                    ).evaluate(_request())
+            self.assertEqual(attempts.read_text(encoding="utf-8"), "1")
+
 
 if __name__ == "__main__":
     unittest.main()

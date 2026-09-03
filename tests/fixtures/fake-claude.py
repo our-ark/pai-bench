@@ -25,6 +25,19 @@ if attempt_file:
     attempt = int(path.read_text(encoding="utf-8")) + 1 if path.exists() else 1
     path.write_text(str(attempt), encoding="utf-8")
 fail_attempts = int(os.environ.get("FAKE_CLAUDE_FAIL_ATTEMPTS", "0"))
+api_error = os.environ.get("FAKE_CLAUDE_API_ERROR", "").strip()
+if api_error:
+    print(
+        json.dumps(
+            {
+                "type": "result",
+                "is_error": True,
+                "terminal_reason": "api_error",
+                "api_error": api_error,
+            }
+        )
+    )
+    raise SystemExit(1)
 if attempt <= fail_attempts:
     print(json.dumps({"type": "result", "is_error": True, "result": "failure"}))
     print("synthetic warning", file=sys.stderr)

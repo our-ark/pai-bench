@@ -38,6 +38,10 @@ _REASONING_EFFORT = re.compile(r"[a-z][a-z0-9_-]{0,31}")
 class ClaudeEvaluatorError(EvaluatorError):
     """Raised when Claude Code cannot score a probe."""
 
+    def __init__(self, message: str, *, retryable: bool = True) -> None:
+        super().__init__(message)
+        self.retryable = retryable
+
 
 @dataclass(frozen=True)
 class ClaudeEvaluator:
@@ -89,11 +93,12 @@ class ClaudeEvaluator:
                 score, usage = self._evaluate_once(executable, state_home, prompt)
             except ClaudeEvaluatorError as error:
                 last_error = error
-                if attempt < self.max_attempts:
+                if error.retryable and attempt < self.max_attempts:
                     continue
                 plural = "attempt" if attempt == 1 else "attempts"
                 raise ClaudeEvaluatorError(
-                    f"Claude evaluator failed after {attempt} {plural}: {error}"
+                    f"Claude evaluator failed after {attempt} {plural}: {error}",
+                    retryable=error.retryable,
                 ) from error
             return EvaluationResult(
                 score=score,
@@ -169,10 +174,11 @@ class ClaudeEvaluator:
             except (OSError, subprocess.SubprocessError) as error:
                 raise ClaudeEvaluatorError(f"Claude evaluator failed: {error}") from error
             if completed.returncode != 0:
-                detail = completed.stderr.strip() or completed.stdout.strip()
+                detail = _failure_detail(completed)
                 raise ClaudeEvaluatorError(
                     "Claude evaluator exited with "
-                    f"{completed.returncode}: {_clip(detail)}"
+                    f"{completed.returncode}: {_clip(detail)}",
+                    retryable=_retryable_failure(detail),
                 )
             payload = _parse_payload(completed.stdout)
             score = _parse_score(payload)
@@ -305,3 +311,37 @@ def _clip(value: str, limit: int = 1000) -> str:
     if len(compact) <= limit:
         return compact
     return compact[: limit - 3] + "..."
+
+
+def _failure_detail(completed: subprocess.CompletedProcess[str]) -> str:
+    for raw in (completed.stdout, completed.stderr):
+        text = raw.strip()
+        if not text:
+            continue
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        for key in ("api_error", "error", "result"):
+            value = payload.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            if isinstance(value, dict):
+                return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return completed.stderr.strip() or completed.stdout.strip() or "unknown failure"
+
+
+def _retryable_failure(detail: str) -> bool:
+    normalized = " ".join(detail.casefold().split())
+    non_retryable = (
+        "hit your limit",
+        "usage limit",
+        "credit balance",
+        "invalid api key",
+        "authentication failed",
+        "not logged in",
+        "subscription required",
+    )
+    return not any(marker in normalized for marker in non_retryable)

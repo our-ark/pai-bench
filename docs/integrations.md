@@ -103,10 +103,14 @@ so target outputs remain byte-identical; do not regenerate target responses.
 For a complete experiment, `rescore-matrix` verifies that the source and
 comparison manifests define identical target grids, replays every saved run,
 writes progress after each run, and supports `--resume` plus process-level
-parallelism through `--max-workers`. Use `--batch-size 1 --batch-index 1` for a
-one-run cost calibration before completing the same output directory with
-`--resume`. The optional `max_budget_usd` manifest field limits each judgment
-independently rather than the full campaign.
+parallelism through `--max-workers`. Use `--max-new-runs 1` for a one-run cost
+calibration before completing the same output directory with `--resume`. For
+quota-window scheduling, `--max-new-runs 4 --max-workers 4`
+automatically selects at most four incomplete runs on every invocation. The
+optional `max_budget_usd` manifest field limits each judgment independently
+rather than the full campaign. Resume also preserves successful probe judgments
+inside an incomplete run, so quota-limited campaigns can fill only the
+remaining probe errors after the provider resets.
 
 ## Configure a development run
 

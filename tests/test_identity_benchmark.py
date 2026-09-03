@@ -31,6 +31,11 @@ from identity_benchmark.contracts import (
     parse_transition_request,
 )
 from identity_benchmark.rescore import RescoreError, rescore_saved_report
+from identity_benchmark.evaluators import (
+    EvaluationRequest,
+    EvaluationResult,
+    EvaluatorError,
+)
 from identity_benchmark.scoring import DeterministicScorer, weighted_expectation_score
 from evaluator_support import (
     SyntheticAgent,
@@ -639,6 +644,59 @@ class IdentityBenchmarkTests(unittest.TestCase):
 
         self.assertEqual(rescored.score, original.score)
 
+    def test_rescore_resume_reuses_successes_and_retries_only_errors(self) -> None:
+        profile = load_benchmark_profile(PROFILE)
+        source = run_benchmark(
+            profile,
+            synthetic_agent_for_profile(
+                profile,
+                instance_id="synthetic-source",
+            ),
+        )
+        failed_probe = profile.probes[0].id
+        first_evaluator = _SelectiveEvaluator({failed_probe})
+        retry_evaluator = _SelectiveEvaluator(set())
+        with TemporaryDirectory() as directory:
+            source_path = Path(directory) / "source.json"
+            source_path.write_text(
+                json.dumps(source.to_dict()),
+                encoding="utf-8",
+            )
+            partial = rescore_saved_report(
+                profile,
+                source_path,
+                evaluator=first_evaluator,
+            )
+            resumed = rescore_saved_report(
+                profile,
+                source_path,
+                evaluator=retry_evaluator,
+                previous_report=partial,
+            )
+
+        self.assertEqual(partial.errors, 1)
+        self.assertEqual(retry_evaluator.calls, [failed_probe])
+        self.assertEqual(resumed.errors, 0)
+        self.assertEqual(
+            {
+                result.probe_id: len(result.expectations)
+                for result in resumed.results
+                if result.probe_id != failed_probe
+            },
+            {
+                result.probe_id: len(result.expectations)
+                for result in partial.results
+                if result.probe_id != failed_probe
+            },
+        )
+        self.assertTrue(
+            all(
+                result.evaluation_metadata.get("rescore_resume_reused") is True
+                for result in resumed.results
+                if result.probe_id != failed_probe
+            )
+        )
+
     def test_saved_transition_decision_can_be_rescored(self) -> None:
         profile = parse_benchmark_profile(
             {
@@ -724,6 +782,20 @@ class _FailingInstance:
     def respond(self, request: BenchmarkRequest) -> InstanceResponse:
         del request
         raise AgentAdapterError("instance unavailable")
+
+
+class _SelectiveEvaluator:
+    evaluator_id = "selective-test-evaluator"
+
+    def __init__(self, failures: set[str]) -> None:
+        self.failures = failures
+        self.calls: list[str] = []
+
+    def evaluate(self, request: EvaluationRequest) -> EvaluationResult:
+        self.calls.append(request.probe.id)
+        if request.probe.id in self.failures:
+            raise EvaluatorError("synthetic quota failure")
+        return TEST_EVALUATOR.evaluate(request)
 
 
 class _ProbeResponseInstance:

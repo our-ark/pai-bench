@@ -7,6 +7,7 @@ from typing import Any
 
 from identity_benchmark.agent_identity import AgentIdentity
 from identity_benchmark.contracts import (
+    BenchmarkReport,
     BenchmarkProfile,
     BenchmarkRequest,
     InstanceResponse,
@@ -16,7 +17,11 @@ from identity_benchmark.contracts import (
     TransitionDecision,
     TransitionRequest,
 )
-from identity_benchmark.evaluators import Evaluator
+from identity_benchmark.evaluators import (
+    EvaluationRequest,
+    EvaluationResult,
+    Evaluator,
+)
 from identity_benchmark.runner import run_benchmark
 
 
@@ -78,6 +83,7 @@ def rescore_saved_report(
     path: Path,
     *,
     evaluator: Evaluator,
+    previous_report: BenchmarkReport | None = None,
 ):
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -139,14 +145,78 @@ def rescore_saved_report(
         raise RescoreError(
             f"saved report probe set differs; missing={missing}, extra={extra}"
         )
+    active_evaluator: Evaluator = evaluator
+    if previous_report is not None:
+        active_evaluator = _ResumeEvaluator(
+            profile,
+            responses,
+            evaluator,
+            previous_report,
+        )
     return run_benchmark(
         profile,
         RecordedInstance(
             instance_id=f"{source_instance_id}:rescored",
             responses=responses,
         ),
-        evaluator=evaluator,
+        evaluator=active_evaluator,
     )
+
+
+class _ResumeEvaluator:
+    """Reuse successful stateless judgments and retry only failed probes."""
+
+    def __init__(
+        self,
+        profile: BenchmarkProfile,
+        responses: dict[str, InstanceResponse],
+        evaluator: Evaluator,
+        previous_report: BenchmarkReport,
+    ) -> None:
+        if previous_report.profile_id != profile.profile_id:
+            raise RescoreError("previous report profile_id does not match the profile")
+        if previous_report.evaluator_id != evaluator.evaluator_id:
+            raise RescoreError("previous report evaluator does not match the evaluator")
+        previous = {result.probe_id: result for result in previous_report.results}
+        expected = {probe.id for probe in profile.probes}
+        if set(previous) != expected:
+            raise RescoreError("previous report probe set differs from the profile")
+        reusable: dict[str, EvaluationResult] = {}
+        for probe_id, result in previous.items():
+            if result.response != responses[probe_id].response:
+                raise RescoreError(
+                    f"previous report response differs for probe {probe_id!r}"
+                )
+            if result.error:
+                continue
+            identity_score = result.component_scores.get("identity")
+            if identity_score is None:
+                raise RescoreError(
+                    f"previous report lacks identity score for probe {probe_id!r}"
+                )
+            metadata = dict(result.evaluation_metadata)
+            metadata["rescore_resume_reused"] = True
+            reusable[probe_id] = EvaluationResult(
+                score=identity_score,
+                expectation_results=tuple(
+                    item
+                    for item in result.expectations
+                    if item.expectation.aspect == "identity"
+                ),
+                metadata=metadata,
+            )
+        self._evaluator = evaluator
+        self._reusable = reusable
+
+    @property
+    def evaluator_id(self) -> str:
+        return self._evaluator.evaluator_id
+
+    def evaluate(self, request: EvaluationRequest) -> EvaluationResult:
+        previous = self._reusable.get(request.probe.id)
+        if previous is not None:
+            return previous
+        return self._evaluator.evaluate(request)
 
 
 def _mapping(value: object, label: str) -> dict[str, Any]:

@@ -633,6 +633,7 @@ def rescore_experiment(
     *,
     batch_size: int | None = None,
     batch_index: int = 1,
+    max_new_runs: int | None = None,
     resume: bool = False,
     max_workers: int = 1,
     evaluator_factory: EvaluatorFactory | None = None,
@@ -680,6 +681,8 @@ def rescore_experiment(
             or runs_by_id[planned.run_id].report.errors != 0
         )
     )
+    if max_new_runs is not None:
+        pending = pending[:_positive_int(max_new_runs, "max_new_runs")]
     source_root = source_output_dir.expanduser().resolve()
     with TemporaryDirectory(
         prefix=f"{comparison_spec.experiment_id}-rescore-state-"
@@ -715,6 +718,7 @@ def rescore_experiment(
                         source_by_id[planned.run_id],
                         state_homes[planned.run_id],
                         active_evaluator_factory,
+                        runs_by_id.get(planned.run_id),
                     )
                 )
         elif pending:
@@ -730,6 +734,7 @@ def rescore_experiment(
                         source_by_id[planned.run_id],
                         state_homes[planned.run_id],
                         active_evaluator_factory,
+                        runs_by_id.get(planned.run_id),
                     ): planned
                     for planned in _interleave_profiles(pending)
                 }
@@ -760,6 +765,7 @@ def _rescore_planned_condition(
     source_run: ExperimentRun,
     state_home: Path,
     evaluator_factory: EvaluatorFactory,
+    previous_run: ExperimentRun | None,
 ) -> ExperimentRun:
     evaluator_state = state_home / "evaluator"
     evaluator_state.mkdir(mode=0o700)
@@ -768,6 +774,7 @@ def _rescore_planned_condition(
         planned.profile,
         source_path,
         evaluator=evaluator,
+        previous_report=(previous_run.report if previous_run is not None else None),
     )
     source_responses = tuple(
         result.response for result in source_run.report.results

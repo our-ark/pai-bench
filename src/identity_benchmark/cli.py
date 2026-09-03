@@ -81,6 +81,7 @@ def main(argv: list[str] | None = None) -> None:
                 args.output_dir,
                 batch_size=args.batch_size,
                 batch_index=args.batch_index,
+                max_new_runs=args.max_new_runs,
                 resume=args.resume,
                 max_workers=args.max_workers,
             )
@@ -296,6 +297,11 @@ def _parser() -> argparse.ArgumentParser:
         type=_positive_integer,
         default=1,
         help="one-based batch to rescore (default: 1)",
+    )
+    rescore_matrix.add_argument(
+        "--max-new-runs",
+        type=_positive_integer,
+        help="process at most this many incomplete runs",
     )
     rescore_matrix.add_argument("--resume", action="store_true")
     rescore_matrix.add_argument(

@@ -137,7 +137,7 @@ bin/identity-benchmark rescore-matrix \
   SOURCE-EXPERIMENT.json SOURCE-REPORT-DIR \
   CLAUDE-COMPARISON-EXPERIMENT.json \
   --output-dir CLAUDE-REPORT-DIR \
-  --batch-size 1 --batch-index 1
+  --max-new-runs 1
 ```
 
 The target responses are replayed unchanged and are never regenerated. Claude
@@ -145,5 +145,8 @@ receives the same frozen rubric and five-point output schema as Codex;
 provider, requested and resolved model metadata, token usage, and reported cost
 are retained with each judgment. `max_budget_usd` is a per-judgment ceiling,
 not a campaign-wide budget; estimate total cost with a small replay before
-starting a full matrix. After the one-run calibration, omit the batch options
-and add `--max-workers 4 --resume` to finish the same matrix.
+starting a full matrix. After calibration, use `--max-new-runs 4 --max-workers
+4 --resume` after each quota reset. The runner automatically selects the next
+four incomplete runs. If a quota reset interrupts a partially judged run,
+resume reuses its successful probe judgments and invokes the evaluator only for
+failed probes.

@@ -528,8 +528,7 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
                     source_output,
                     comparison_spec,
                     comparison_output,
-                    batch_size=1,
-                    batch_index=1,
+                    max_new_runs=1,
                     max_workers=2,
                     evaluator_factory=expectation_evaluator_factory,
             )
