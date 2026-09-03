@@ -144,6 +144,8 @@ class ClaudeEvaluator:
                 "--tools",
                 "",
                 "--no-session-persistence",
+                "--prompt-suggestions",
+                "false",
                 "--model",
                 self.model,
                 "--effort",

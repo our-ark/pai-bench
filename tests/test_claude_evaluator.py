@@ -59,6 +59,10 @@ class ClaudeEvaluatorTests(unittest.TestCase):
         self.assertIn("--strict-mcp-config", recorded["args"])
         self.assertIn("--no-session-persistence", recorded["args"])
         self.assertEqual(
+            recorded["args"][recorded["args"].index("--prompt-suggestions") + 1],
+            "false",
+        )
+        self.assertEqual(
             recorded["args"][recorded["args"].index("--tools") + 1], ""
         )
         self.assertEqual(
