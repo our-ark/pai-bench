@@ -19,8 +19,12 @@ from identity_benchmark.experiments import (
     format_experiment_report,
     load_experiment_spec,
     plan_experiment,
+    rescore_experiment,
 )
-from evaluator_support import run_test_experiment as run_experiment
+from evaluator_support import (
+    expectation_evaluator_factory,
+    run_test_experiment as run_experiment,
+)
 
 
 PROFILE = FIXTURES / "synthetic-profile.json"
@@ -488,6 +492,112 @@ class IdentityBenchmarkExperimentTests(unittest.TestCase):
         self.assertEqual(run_one, run_one_after_resume)
         self.assertEqual(saved["status"], "complete")
         self.assertEqual(saved["progress"]["completed_runs"], 2)
+
+    def test_rescore_matrix_reuses_saved_target_responses_and_resumes(self) -> None:
+        with TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            source_manifest = self._manifest(temporary)
+            source_spec = load_experiment_spec(source_manifest)
+            source_output = temporary / "source-reports"
+            source = run_experiment(source_spec, source_output)
+
+            comparison_manifest = temporary / "comparison.json"
+            comparison_value = json.loads(
+                source_manifest.read_text(encoding="utf-8")
+            )
+            comparison_value["experiment_id"] = "resumable-fixture-claude-judge"
+            comparison_value["evaluator"] = {
+                "provider": "claude",
+                "id": "claude-test-judge-v1",
+                "model": "sonnet",
+                "reasoning_effort": "high",
+                "rubric_version": "pai-model-judge-v2",
+            }
+            comparison_manifest.write_text(
+                json.dumps(comparison_value), encoding="utf-8"
+            )
+            comparison_spec = load_experiment_spec(comparison_manifest)
+            comparison_output = temporary / "comparison-reports"
+
+            with patch(
+                "identity_benchmark.experiments.ProcessPoolExecutor",
+                _ImmediateProcessPool,
+            ):
+                first_batch = rescore_experiment(
+                    source_spec,
+                    source_output,
+                    comparison_spec,
+                    comparison_output,
+                    batch_size=1,
+                    batch_index=1,
+                    max_workers=2,
+                    evaluator_factory=expectation_evaluator_factory,
+            )
+            first_run = comparison_output / "runs" / "run-0001.json"
+            first_saved = first_run.read_text(encoding="utf-8")
+            with patch(
+                "identity_benchmark.experiments.ProcessPoolExecutor",
+                _ImmediateProcessPool,
+            ):
+                compared = rescore_experiment(
+                    source_spec,
+                    source_output,
+                    comparison_spec,
+                    comparison_output,
+                    resume=True,
+                    max_workers=2,
+                    evaluator_factory=expectation_evaluator_factory,
+                )
+            first_after_resume = first_run.read_text(encoding="utf-8")
+
+        source_responses = [
+            result.response
+            for run in source.runs
+            for result in run.report.results
+        ]
+        comparison_responses = [
+            result.response
+            for run in compared.runs
+            for result in run.report.results
+        ]
+        self.assertEqual(comparison_responses, source_responses)
+        self.assertFalse(first_batch.is_complete)
+        self.assertEqual(first_batch.completed_runs, 1)
+        self.assertTrue(compared.is_complete)
+        self.assertEqual(compared.completed_runs, source.completed_runs)
+        self.assertEqual(compared.max_workers, 2)
+        self.assertEqual(
+            {run.report.evaluator_id for run in compared.runs},
+            {"test-expectation-v1"},
+        )
+        self.assertEqual(first_saved, first_after_resume)
+
+    def test_rescore_matrix_rejects_a_different_target_grid(self) -> None:
+        with TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            source_manifest = self._manifest(temporary)
+            source_spec = load_experiment_spec(source_manifest)
+            source_output = temporary / "source-reports"
+            run_experiment(source_spec, source_output)
+
+            comparison_manifest = temporary / "comparison.json"
+            comparison_value = json.loads(
+                source_manifest.read_text(encoding="utf-8")
+            )
+            comparison_value["experiment_id"] = "different-target-grid"
+            comparison_value["models"] = ["different-target-model"]
+            comparison_manifest.write_text(
+                json.dumps(comparison_value), encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(ExperimentError, "identical target runs"):
+                rescore_experiment(
+                    source_spec,
+                    source_output,
+                    load_experiment_spec(comparison_manifest),
+                    temporary / "comparison-reports",
+                    evaluator_factory=expectation_evaluator_factory,
+                )
 
     def test_resume_rejects_a_tampered_run_fingerprint(self) -> None:
         with TemporaryDirectory() as directory:

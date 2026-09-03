@@ -175,9 +175,9 @@ not contaminate the remaining stateful sequence.
 
 The benchmark defines an `Evaluator` interface over the frozen reference
 contract, probe, observable expectations, and target response. The bundled
-`CodexEvaluator` implements that interface with an isolated Codex model judge
-and returns a score plus provenance metadata. Target adapters and evaluation
-remain independent.
+`CodexEvaluator` and `ClaudeEvaluator` implementations use isolated provider
+processes and return a score plus provenance metadata. Target adapters and
+evaluation remain independent.
 
 Capability probes are controls, not identity measurements. They are reported
 separately and excluded from the headline identity score.

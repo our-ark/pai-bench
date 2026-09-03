@@ -14,6 +14,7 @@ FIXTURES = ROOT / "tests" / "fixtures"
 
 from identity_benchmark import (
     AgentAdapter,
+    ClaudeEvaluator,
     CodexEvaluator,
     EnochAdapter,
 )
@@ -59,6 +60,18 @@ class IdentityBenchmarkEvaluatorTests(unittest.TestCase):
             )
 
         self.assertEqual(evaluator.evaluator_id, "codex-judge-v1")
+        self.assertTrue(callable(evaluator.evaluate))
+
+    def test_claude_evaluator_exposes_the_evaluator_contract(self) -> None:
+        with TemporaryDirectory() as directory:
+            evaluator = ClaudeEvaluator(
+                evaluator_id="claude-judge-v1",
+                model="sonnet",
+                reasoning_effort="high",
+                state_home=Path(directory),
+            )
+
+        self.assertEqual(evaluator.evaluator_id, "claude-judge-v1")
         self.assertTrue(callable(evaluator.evaluate))
 
     def test_evaluator_failure_is_separate_from_agent_response(self) -> None:
@@ -142,6 +155,48 @@ class IdentityBenchmarkEvaluatorTests(unittest.TestCase):
         self.assertEqual(report.aggregates[0]["evaluator_id"], "codex-judge-v1")
         self.assertEqual(saved["evaluator_ids"], ["codex-judge-v1"])
         self.assertFalse(state_home.exists())
+
+    def test_matrix_constructs_claude_evaluator_from_provider_field(self) -> None:
+        with TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            manifest = temporary / "experiment.json"
+            manifest.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "experiment_id": "claude-evaluator-fixture",
+                        "profile": str(PROFILE),
+                        "body_root": str(ROOT),
+                        "models": ["agent-model"],
+                        "reasoning_efforts": ["low"],
+                        "identity_modes": ["full-context"],
+                        "evaluator": {
+                            "provider": "claude",
+                            "id": "claude-judge-v1",
+                            "model": "sonnet",
+                            "reasoning_effort": "high",
+                            "rubric_version": "pai-model-judge-v2",
+                            "max_budget_usd": 0.25,
+                        },
+                        "timeout_seconds": 10,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            evaluator = _MetadataEvaluator()
+            with patch(
+                "identity_benchmark.experiments.ClaudeEvaluator",
+                return_value=evaluator,
+            ) as constructor:
+                run_experiment(
+                    load_experiment_spec(manifest),
+                    temporary / "reports",
+                    agent_factory=synthetic_agent_factory,
+                )
+
+        self.assertEqual(constructor.call_args.kwargs["model"], "sonnet")
+        self.assertEqual(constructor.call_args.kwargs["reasoning_effort"], "high")
+        self.assertEqual(constructor.call_args.kwargs["max_budget_usd"], 0.25)
 
     def test_matrix_constructs_enoch_adapter_directly(self) -> None:
         spec = load_experiment_spec(

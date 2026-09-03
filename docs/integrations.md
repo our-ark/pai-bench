@@ -6,7 +6,7 @@ PAI-Bench keeps three roles separate:
 | --- | --- | --- |
 | Benchmark core | `target_adapters.py` | Defines the `AgentAdapter` interface, including explicit identity and startup-context installation, and per-condition configuration. |
 | Target implementation | `EnochAdapter` in `integrations/enoch_adapter.py` | Implements `AgentAdapter`, installs isolated identity and non-identity context, and obtains an answer through Enoch. |
-| Evaluator implementation | `CodexEvaluator` in `codex_evaluator.py` | Implements the evaluator interface and scores the saved answer with an isolated Codex process. |
+| Evaluator implementations | `CodexEvaluator` and `ClaudeEvaluator` | Implement the evaluator interface and score the saved answer with isolated provider CLI processes. |
 
 ## EnochAdapter
 
@@ -70,6 +70,43 @@ Authentication still comes from the host's existing Codex CLI login. Set
 `PAI_BENCH_CODEX_BIN` when `codex` is not on `PATH`. The evaluator records its
 model, reasoning effort, rubric version, executable source, and token usage in
 the result metadata.
+
+## ClaudeEvaluator
+
+`ClaudeEvaluator` independently implements the same `Evaluator` interface and
+uses the identical frozen evaluator prompt, rubric version, five-point score
+scale, and structured output schema. It starts a fresh non-interactive Claude
+Code process for every judgment with safe mode, restricted mode, no tools, no
+MCP servers, no user customizations, and no session persistence. Authentication
+comes from the host Claude Code login or Anthropic API environment.
+
+Select it in a development experiment manifest with an explicit provider:
+
+```json
+{
+  "evaluator": {
+    "provider": "claude",
+    "id": "claude-sonnet-high-v2",
+    "model": "sonnet",
+    "reasoning_effort": "high",
+    "rubric_version": "pai-model-judge-v2",
+    "timeout_seconds": 600,
+    "max_budget_usd": 0.25
+  }
+}
+```
+
+`PAI_BENCH_CLAUDE_BIN` or `evaluator.executable` can pin the CLI path. The
+evaluator records the requested model alias and any exact resolved model names
+reported by Claude Code. Use saved-response rescoring for cross-judge analysis
+so target outputs remain byte-identical; do not regenerate target responses.
+For a complete experiment, `rescore-matrix` verifies that the source and
+comparison manifests define identical target grids, replays every saved run,
+writes progress after each run, and supports `--resume` plus process-level
+parallelism through `--max-workers`. Use `--batch-size 1 --batch-index 1` for a
+one-run cost calibration before completing the same output directory with
+`--resume`. The optional `max_budget_usd` manifest field limits each judgment
+independently rather than the full campaign.
 
 ## Configure a development run
 

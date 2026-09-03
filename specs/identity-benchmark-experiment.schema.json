@@ -89,6 +89,9 @@
       "required": ["id", "model", "reasoning_effort", "rubric_version"],
       "properties": {
         "id": {"$ref": "#/$defs/identifier"},
+        "provider": {"enum": ["codex", "claude"], "default": "codex"},
+        "executable": {"type": "string", "minLength": 1},
+        "max_budget_usd": {"type": "number", "exclusiveMinimum": 0},
         "harness": {
           "type": "string",
           "minLength": 1,

@@ -11,13 +11,14 @@ from identity_benchmark.target_adapters import (
     AgentAdapterError,
 )
 from identity_benchmark.codex_evaluator import CodexEvaluator
+from identity_benchmark.claude_evaluator import ClaudeEvaluator
 from identity_benchmark.contracts import (
     BenchmarkProfile,
     BenchmarkProfileError,
     BenchmarkReport,
     load_benchmark_profile,
 )
-from identity_benchmark.evaluators import EvaluatorError
+from identity_benchmark.evaluators import Evaluator, EvaluatorError
 from identity_benchmark.integrations.enoch_adapter import (
     EnochAdapter,
     IDENTITY_MODES,
@@ -28,6 +29,7 @@ from identity_benchmark.experiments import (
     format_experiment_report,
     load_experiment_spec,
     plan_experiment,
+    rescore_experiment,
     run_experiment,
 )
 from identity_benchmark.runner import run_benchmark
@@ -90,11 +92,24 @@ def main(argv: list[str] | None = None) -> None:
                 report = rescore_saved_report(
                     profile,
                     args.report,
-                    evaluator=_codex_evaluator_from_args(args, Path(state)),
+                    evaluator=_evaluator_from_args(args, Path(state)),
                 )
             if args.json_out:
                 _write_report(args.json_out, report)
             print(format_report(report))
+            return
+        if args.action == "rescore-matrix":
+            report = rescore_experiment(
+                load_experiment_spec(args.source_experiment),
+                args.source_report_dir,
+                load_experiment_spec(args.comparison_experiment),
+                args.output_dir,
+                batch_size=args.batch_size,
+                batch_index=args.batch_index,
+                resume=args.resume,
+                max_workers=args.max_workers,
+            )
+            print(format_experiment_report(report))
             return
         if args.action == "bootstrap":
             spec = load_experiment_spec(args.experiment)
@@ -162,7 +177,7 @@ def main(argv: list[str] | None = None) -> None:
             report = run_benchmark(
                 profile,
                 instance,
-                evaluator=_codex_evaluator_from_args(
+                evaluator=_evaluator_from_args(
                     args,
                     state_root / "evaluator",
                 ),
@@ -263,6 +278,31 @@ def _parser() -> argparse.ArgumentParser:
     rescore.add_argument("report", type=Path)
     rescore.add_argument("--json-out", type=Path)
     _add_evaluator_arguments(rescore)
+    rescore_matrix = subparsers.add_parser(
+        "rescore-matrix",
+        help="rescore a saved matrix with a comparison evaluator",
+    )
+    rescore_matrix.add_argument("source_experiment", type=Path)
+    rescore_matrix.add_argument("source_report_dir", type=Path)
+    rescore_matrix.add_argument("comparison_experiment", type=Path)
+    rescore_matrix.add_argument("--output-dir", type=Path, required=True)
+    rescore_matrix.add_argument(
+        "--batch-size",
+        type=_positive_integer,
+        help="rescore only this many target conditions",
+    )
+    rescore_matrix.add_argument(
+        "--batch-index",
+        type=_positive_integer,
+        default=1,
+        help="one-based batch to rescore (default: 1)",
+    )
+    rescore_matrix.add_argument("--resume", action="store_true")
+    rescore_matrix.add_argument(
+        "--max-workers",
+        type=_positive_integer,
+        default=1,
+    )
     bootstrap = subparsers.add_parser(
         "bootstrap",
         help="estimate clustered confidence intervals from saved matrix runs",
@@ -314,6 +354,11 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _add_evaluator_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--evaluator-provider",
+        choices=("codex", "claude"),
+        default="codex",
+    )
     parser.add_argument("--evaluator-id", default="codex-evaluator")
     parser.add_argument("--evaluator-model", required=True)
     parser.add_argument("--evaluator-reasoning-effort", default="xhigh")
@@ -322,21 +367,41 @@ def _add_evaluator_arguments(parser: argparse.ArgumentParser) -> None:
         default="pai-model-judge-v2",
     )
     parser.add_argument("--evaluator-timeout", type=float, default=600.0)
-    parser.add_argument("--codex-bin", default="")
+    parser.add_argument(
+        "--evaluator-bin",
+        "--codex-bin",
+        dest="evaluator_bin",
+        default="",
+        help="judge CLI executable; --codex-bin is retained as a legacy alias",
+    )
+    parser.add_argument("--evaluator-max-budget-usd", type=float)
 
 
-def _codex_evaluator_from_args(
+def _evaluator_from_args(
     args: argparse.Namespace,
     state_home: Path,
-) -> CodexEvaluator:
+) -> Evaluator:
+    common = {
+        "evaluator_id": args.evaluator_id,
+        "model": args.evaluator_model,
+        "reasoning_effort": args.evaluator_reasoning_effort,
+        "rubric_version": args.evaluator_rubric_version,
+        "timeout_seconds": args.evaluator_timeout,
+        "state_home": state_home,
+    }
+    if args.evaluator_provider == "claude":
+        return ClaudeEvaluator(
+            **common,
+            claude_bin=args.evaluator_bin,
+            max_budget_usd=args.evaluator_max_budget_usd,
+        )
+    if args.evaluator_max_budget_usd is not None:
+        raise EvaluatorError(
+            "--evaluator-max-budget-usd is supported only for the Claude evaluator"
+        )
     return CodexEvaluator(
-        evaluator_id=args.evaluator_id,
-        model=args.evaluator_model,
-        reasoning_effort=args.evaluator_reasoning_effort,
-        rubric_version=args.evaluator_rubric_version,
-        timeout_seconds=args.evaluator_timeout,
-        codex_bin=args.codex_bin,
-        state_home=state_home,
+        **common,
+        codex_bin=args.evaluator_bin,
     )
 
 

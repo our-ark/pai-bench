@@ -29,7 +29,9 @@ from identity_benchmark.runner import (
     run_benchmark,
     validate_report_integrity,
 )
+from identity_benchmark.rescore import rescore_saved_report
 from identity_benchmark.codex_evaluator import CodexEvaluator
+from identity_benchmark.claude_evaluator import ClaudeEvaluator
 from identity_benchmark.evaluators import Evaluator
 from identity_benchmark.integrations.enoch_adapter import EnochAdapter
 from identity_benchmark.probe_suites import (
@@ -58,6 +60,9 @@ class EvaluatorSpec:
     reasoning_effort: str
     rubric_version: str
     timeout_seconds: float = 600.0
+    provider: str = "codex"
+    executable: str = ""
+    max_budget_usd: float | None = None
 
 
 EvaluatorFactory = Callable[[EvaluatorSpec | None, Path], Evaluator]
@@ -509,10 +514,10 @@ def run_experiment(
     evaluator_factory: EvaluatorFactory | None = None,
 ) -> ExperimentReport:
     active_agent_factory = agent_factory or _enoch_agent
-    active_evaluator_factory = evaluator_factory or _codex_evaluator
+    active_evaluator_factory = evaluator_factory or _model_evaluator
     if evaluator_factory is None and spec.evaluator is None:
         raise ExperimentError(
-            "experiment manifest must define a Codex evaluator"
+            "experiment manifest must define an evaluator"
         )
     workers = _positive_int(max_workers, "max_workers")
     plan = plan_experiment(
@@ -618,6 +623,195 @@ def run_experiment(
         started_at,
         max_workers=workers,
     )
+
+
+def rescore_experiment(
+    source_spec: ExperimentSpec,
+    source_output_dir: Path,
+    comparison_spec: ExperimentSpec,
+    output_dir: Path,
+    *,
+    batch_size: int | None = None,
+    batch_index: int = 1,
+    resume: bool = False,
+    max_workers: int = 1,
+    evaluator_factory: EvaluatorFactory | None = None,
+) -> ExperimentReport:
+    """Rescore a complete saved matrix without regenerating target responses."""
+    if comparison_spec.evaluator is None and evaluator_factory is None:
+        raise ExperimentError("comparison experiment must define an evaluator")
+    source_plan, source_runs = load_saved_experiment_runs(
+        source_spec,
+        source_output_dir,
+        require_complete=True,
+    )
+    comparison_plan = plan_experiment(
+        comparison_spec,
+        batch_size=batch_size,
+        batch_index=batch_index,
+    )
+    _validate_rescore_plans(source_plan, comparison_plan)
+    source_by_id = {run.run_id: run for run in source_runs}
+    workers = _positive_int(max_workers, "max_workers")
+    output = output_dir.expanduser().resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    _prepare_output(output, comparison_plan, resume=resume)
+    existing = _load_existing_runs(output, comparison_plan) if resume else {}
+    started_at = _existing_started_at(output) if existing else _now()
+    runs_by_id = dict(existing)
+    unique_profiles = tuple(
+        dict.fromkeys(run.profile.profile_id for run in comparison_plan.runs)
+    )
+    profiles = tuple(
+        next(
+            run.profile
+            for run in comparison_plan.runs
+            if run.profile.profile_id == profile_id
+        )
+        for profile_id in unique_profiles
+    )
+    population_groups = _population_groups(comparison_spec.population_path, profiles)
+    active_evaluator_factory = evaluator_factory or _model_evaluator
+    pending = tuple(
+        planned
+        for planned in comparison_plan.selected_runs
+        if (
+            planned.run_id not in runs_by_id
+            or runs_by_id[planned.run_id].report.errors != 0
+        )
+    )
+    source_root = source_output_dir.expanduser().resolve()
+    with TemporaryDirectory(
+        prefix=f"{comparison_spec.experiment_id}-rescore-state-"
+    ) as temporary:
+        state_parent = Path(temporary)
+        state_homes = {}
+        for planned in pending:
+            state_home = state_parent / planned.run_id
+            state_home.mkdir(mode=0o700)
+            state_homes[planned.run_id] = state_home
+
+        def save(run: ExperimentRun) -> None:
+            runs_by_id[run.run_id] = run
+            _write_json(output / "runs" / f"{run.run_id}.json", run.to_dict())
+            _write_experiment_report(
+                output,
+                comparison_spec,
+                comparison_plan,
+                runs_by_id,
+                profiles,
+                population_groups,
+                started_at,
+                max_workers=workers,
+            )
+
+        if workers == 1:
+            for planned in pending:
+                save(
+                    _rescore_planned_condition(
+                        comparison_spec,
+                        planned,
+                        source_root / "runs" / f"{planned.run_id}.json",
+                        source_by_id[planned.run_id],
+                        state_homes[planned.run_id],
+                        active_evaluator_factory,
+                    )
+                )
+        elif pending:
+            with ProcessPoolExecutor(
+                max_workers=min(workers, len(pending))
+            ) as executor:
+                futures = {
+                    executor.submit(
+                        _rescore_planned_condition,
+                        comparison_spec,
+                        planned,
+                        source_root / "runs" / f"{planned.run_id}.json",
+                        source_by_id[planned.run_id],
+                        state_homes[planned.run_id],
+                        active_evaluator_factory,
+                    ): planned
+                    for planned in _interleave_profiles(pending)
+                }
+                for future in as_completed(futures):
+                    planned = futures[future]
+                    try:
+                        save(future.result())
+                    except Exception as error:
+                        raise ExperimentError(
+                            f"Parallel rescore worker for {planned.run_id} failed: {error}"
+                        ) from error
+    return _write_experiment_report(
+        output,
+        comparison_spec,
+        comparison_plan,
+        runs_by_id,
+        profiles,
+        population_groups,
+        started_at,
+        max_workers=workers,
+    )
+
+
+def _rescore_planned_condition(
+    spec: ExperimentSpec,
+    planned: PlannedRun,
+    source_path: Path,
+    source_run: ExperimentRun,
+    state_home: Path,
+    evaluator_factory: EvaluatorFactory,
+) -> ExperimentRun:
+    evaluator_state = state_home / "evaluator"
+    evaluator_state.mkdir(mode=0o700)
+    evaluator = evaluator_factory(spec.evaluator, evaluator_state)
+    report = rescore_saved_report(
+        planned.profile,
+        source_path,
+        evaluator=evaluator,
+    )
+    source_responses = tuple(
+        result.response for result in source_run.report.results
+    )
+    rescored_responses = tuple(result.response for result in report.results)
+    if rescored_responses != source_responses:
+        raise ExperimentError(
+            f"rescore changed target responses for {planned.run_id}"
+        )
+    return ExperimentRun(
+        run_id=planned.run_id,
+        profile_id=planned.profile.profile_id,
+        model=planned.model,
+        reasoning_effort=planned.reasoning_effort,
+        identity_mode=planned.identity_mode,
+        repetition=planned.repetition,
+        report=report,
+        experiment_id=spec.experiment_id,
+        fingerprint=planned.fingerprint,
+    )
+
+
+def _validate_rescore_plans(
+    source: ExperimentPlan,
+    comparison: ExperimentPlan,
+) -> None:
+    def target_signature(plan: ExperimentPlan) -> tuple[tuple[object, ...], ...]:
+        return tuple(
+            (
+                run.run_id,
+                run.profile.profile_id,
+                run.profile.to_dict(),
+                run.model,
+                run.reasoning_effort,
+                run.identity_mode,
+                run.repetition,
+            )
+            for run in plan.runs
+        )
+
+    if target_signature(source) != target_signature(comparison):
+        raise ExperimentError(
+            "source and comparison experiments must define identical target runs"
+        )
 
 
 def _run_planned_condition(
@@ -854,6 +1048,12 @@ def _run_fingerprint(
             "rubric_version": spec.evaluator.rubric_version,
             "timeout_seconds": spec.evaluator.timeout_seconds,
         }
+        # Preserve fingerprints for frozen v1 manifests whose implicit provider
+        # is Codex; provider-specific fields extend only new experiment plans.
+        if spec.evaluator.provider != "codex":
+            evaluator["provider"] = spec.evaluator.provider
+        if spec.evaluator.max_budget_usd is not None:
+            evaluator["max_budget_usd"] = spec.evaluator.max_budget_usd
     return _fingerprint(
         {
             "experiment_id": spec.experiment_id,
@@ -1132,7 +1332,14 @@ def _evaluator_spec(value: object) -> EvaluatorSpec | None:
             "reasoning_effort",
             "rubric_version",
         },
-        optional={"timeout_seconds", "harness", "command"},
+        optional={
+            "provider",
+            "timeout_seconds",
+            "executable",
+            "max_budget_usd",
+            "harness",
+            "command",
+        },
     )
     if "harness" in root:
         _text(root["harness"], "evaluator.harness")
@@ -1153,16 +1360,36 @@ def _evaluator_spec(value: object) -> EvaluatorSpec | None:
         timeout_seconds=_positive_number(
             root.get("timeout_seconds", 600.0), "evaluator.timeout_seconds"
         ),
+        provider=_evaluator_provider(root.get("provider", "codex")),
+        executable=(
+            _text(root["executable"], "evaluator.executable")
+            if "executable" in root
+            else ""
+        ),
+        max_budget_usd=(
+            _positive_number(root["max_budget_usd"], "evaluator.max_budget_usd")
+            if "max_budget_usd" in root
+            else None
+        ),
     )
 
 
-def _codex_evaluator(
+def _model_evaluator(
     spec: EvaluatorSpec | None,
     state_home: Path,
 ) -> Evaluator:
     if spec is None:
-        raise ExperimentError(
-            "experiment manifest must define a Codex evaluator"
+        raise ExperimentError("experiment manifest must define an evaluator")
+    if spec.provider == "claude":
+        return ClaudeEvaluator(
+            evaluator_id=spec.evaluator_id,
+            model=spec.model,
+            reasoning_effort=spec.reasoning_effort,
+            rubric_version=spec.rubric_version,
+            timeout_seconds=spec.timeout_seconds,
+            state_home=state_home,
+            claude_bin=spec.executable,
+            max_budget_usd=spec.max_budget_usd,
         )
     return CodexEvaluator(
         evaluator_id=spec.evaluator_id,
@@ -1171,7 +1398,15 @@ def _codex_evaluator(
         rubric_version=spec.rubric_version,
         timeout_seconds=spec.timeout_seconds,
         state_home=state_home,
+        codex_bin=spec.executable,
     )
+
+
+def _evaluator_provider(value: object) -> str:
+    provider = _text(value, "evaluator.provider")
+    if provider not in {"codex", "claude"}:
+        raise ExperimentError("evaluator.provider must be codex or claude")
+    return provider
 
 
 def _enoch_agent(config: AgentAdapterConfig) -> EnochAdapter:

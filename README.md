@@ -10,8 +10,8 @@ source-challenge splits. Every identity uses the same 32 question templates.
 The repository is self-contained: it includes the installable Python package,
 tests, schemas, documentation, release generator, and frozen public data. The
 target contract is agent-framework and model-provider neutral. Evaluation is
-defined by a small `Evaluator` interface; the bundled implementation is
-`CodexEvaluator`.
+defined by a small `Evaluator` interface; the bundled implementations are
+`CodexEvaluator` and `ClaudeEvaluator`.
 
 ## Install
 
@@ -21,9 +21,9 @@ python3 -m pip install .
 
 The package exposes the `identity-benchmark` and
 `identity-benchmark-replay` commands. It also includes directly importable
-`EnochAdapter` and `CodexEvaluator` implementations. The checkout-local
-launchers under `bin/` select Python 3.11 or newer without requiring an
-installation.
+`EnochAdapter`, `CodexEvaluator`, and `ClaudeEvaluator` implementations. The
+checkout-local launchers under `bin/` select Python 3.11 or newer without
+requiring an installation.
 
 ## Release layout
 
@@ -103,12 +103,47 @@ evaluation rules after inspecting responses from either frozen split.
 ## Adapter configuration
 
 The runner constructs `EnochAdapter` directly from `body_root` and each matrix
-condition, and constructs `CodexEvaluator` directly from the evaluator section
-of the experiment manifest. Custom harnesses can inject another
+condition, and constructs `CodexEvaluator` or `ClaudeEvaluator` from the
+provider named by the evaluator section of the experiment manifest. Omitting
+`provider` retains the frozen v1 Codex behavior. Custom harnesses can inject another
 `AgentAdapter` factory without changing benchmark questions or scoring.
 
 In decoupled experiments, the adapter receives only the identity contract.
 Questions and private scoring bindings stay runner-side. State transitions use
 a separate adapter control call after inference; see the
-[protocol](docs/protocol.md). For the Enoch target and independent Codex judge,
+[protocol](docs/protocol.md). For the Enoch target and independent model judges,
 see [target and evaluator integrations](docs/integrations.md).
+
+To rescore one saved response artifact with an independent Claude judge, first
+authenticate the local Claude Code CLI, then select the provider explicitly:
+
+```bash
+claude auth login
+bin/identity-benchmark rescore PROFILE.json SAVED-RUN.json \
+  --evaluator-provider claude \
+  --evaluator-id claude-sonnet-high-v2 \
+  --evaluator-model sonnet \
+  --evaluator-reasoning-effort high \
+  --evaluator-max-budget-usd 0.25 \
+  --json-out RESCORED-RUN.json
+```
+
+For a complete saved experiment, make a comparison manifest with the same
+profiles, target models, reasoning levels, identity modes, and repetitions, but
+with a new experiment ID and a Claude evaluator. Then replay the whole matrix:
+
+```bash
+bin/identity-benchmark rescore-matrix \
+  SOURCE-EXPERIMENT.json SOURCE-REPORT-DIR \
+  CLAUDE-COMPARISON-EXPERIMENT.json \
+  --output-dir CLAUDE-REPORT-DIR \
+  --batch-size 1 --batch-index 1
+```
+
+The target responses are replayed unchanged and are never regenerated. Claude
+receives the same frozen rubric and five-point output schema as Codex;
+provider, requested and resolved model metadata, token usage, and reported cost
+are retained with each judgment. `max_budget_usd` is a per-judgment ceiling,
+not a campaign-wide budget; estimate total cost with a small replay before
+starting a full matrix. After the one-run calibration, omit the batch options
+and add `--max-workers 4 --resume` to finish the same matrix.

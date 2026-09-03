@@ -43,6 +43,10 @@ from identity_benchmark.codex_evaluator import (
     CodexEvaluator,
     CodexEvaluatorError,
 )
+from identity_benchmark.claude_evaluator import (
+    ClaudeEvaluator,
+    ClaudeEvaluatorError,
+)
 from identity_benchmark.evaluators import (
     EvaluationRequest,
     EvaluationResult,
@@ -58,6 +62,7 @@ from identity_benchmark.experiments import (
     load_saved_experiment_runs,
     load_experiment_spec,
     passes_counterfactual_gates,
+    rescore_experiment,
     run_experiment,
 )
 from identity_benchmark.statistics import (
@@ -111,6 +116,8 @@ __all__ = [
     "BenchmarkProfile",
     "BenchmarkProfileError",
     "BenchmarkReport",
+    "ClaudeEvaluator",
+    "ClaudeEvaluatorError",
     "CodexEvaluator",
     "CodexEvaluatorError",
     "DEFAULT_BOOTSTRAP_SAMPLES",
@@ -161,6 +168,7 @@ __all__ = [
     "passes_counterfactual_gates",
     "run_benchmark",
     "run_experiment",
+    "rescore_experiment",
     "TransitionAttempt",
     "TransitionAttemptRequest",
     "TransitionDecision",
