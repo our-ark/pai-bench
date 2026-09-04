@@ -588,6 +588,47 @@ class IdentityBenchmarkTests(unittest.TestCase):
         self.assertIn("metric_scores", report)
         self.assertEqual(report["errors"], 0)
 
+    def test_rescore_matrix_cli_forwards_max_new_runs(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output), patch(
+            "identity_benchmark.cli.load_experiment_spec",
+            side_effect=("source-spec", "comparison-spec"),
+        ), patch(
+            "identity_benchmark.cli.rescore_experiment",
+            return_value="comparison-report",
+        ) as rescore, patch(
+            "identity_benchmark.cli.format_experiment_report",
+            return_value="formatted-report",
+        ):
+            main(
+                [
+                    "rescore-matrix",
+                    "source-experiment.json",
+                    "source-reports",
+                    "comparison-experiment.json",
+                    "--output-dir",
+                    "comparison-reports",
+                    "--resume",
+                    "--max-new-runs",
+                    "1",
+                    "--max-workers",
+                    "1",
+                ]
+            )
+
+        rescore.assert_called_once_with(
+            "source-spec",
+            Path("source-reports"),
+            "comparison-spec",
+            Path("comparison-reports"),
+            batch_size=None,
+            batch_index=1,
+            max_new_runs=1,
+            resume=True,
+            max_workers=1,
+        )
+        self.assertEqual(output.getvalue().strip(), "formatted-report")
+
     def test_saved_responses_can_be_rescored_without_running_the_instance(self) -> None:
         profile = load_benchmark_profile(PROFILE)
         source = run_benchmark(

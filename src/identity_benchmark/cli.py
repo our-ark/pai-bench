@@ -107,6 +107,7 @@ def main(argv: list[str] | None = None) -> None:
                 args.output_dir,
                 batch_size=args.batch_size,
                 batch_index=args.batch_index,
+                max_new_runs=args.max_new_runs,
                 resume=args.resume,
                 max_workers=args.max_workers,
             )
