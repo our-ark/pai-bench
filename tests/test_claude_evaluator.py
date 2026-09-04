@@ -157,14 +157,14 @@ class ClaudeEvaluatorTests(unittest.TestCase):
                 {
                     "FAKE_CLAUDE_ATTEMPT_FILE": str(attempts),
                     "FAKE_CLAUDE_API_ERROR": (
-                        "You've hit your limit; usage resets later."
+                        "You've hit your session limit; usage resets later."
                     ),
                 },
                 clear=False,
             ):
                 with self.assertRaisesRegex(
                     ClaudeEvaluatorError,
-                    "hit your limit",
+                    "hit your session limit",
                 ):
                     ClaudeEvaluator(
                         evaluator_id="claude-judge-v1",

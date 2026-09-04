@@ -337,6 +337,7 @@ def _retryable_failure(detail: str) -> bool:
     normalized = " ".join(detail.casefold().split())
     non_retryable = (
         "hit your limit",
+        "hit your session limit",
         "usage limit",
         "credit balance",
         "invalid api key",
