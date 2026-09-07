@@ -58,6 +58,11 @@
       "additionalProperties": {"type": "string", "minLength": 1}
     },
     "body_root": {"type": "string", "minLength": 1},
+    "runtime_provider": {
+      "enum": ["codex", "claude"],
+      "default": "codex",
+      "description": "Enoch target runtime provider, independent of evaluator.provider."
+    },
     "instance_command": {
       "type": "array",
       "minItems": 1,

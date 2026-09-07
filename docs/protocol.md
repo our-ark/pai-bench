@@ -200,9 +200,10 @@ at each depth. These control metrics do not enter the headline score.
 
 ## Experiment matrix
 
-An experiment manifest defines the agent checkout, target models, reasoning
-efforts, identity modes, repetitions, timeouts, and Codex evaluator
-configuration. The bundled runner constructs `EnochAdapter` directly; another
+An experiment manifest defines the agent checkout, target `runtime_provider`
+(Codex by default, or Claude), models, reasoning efforts, identity modes,
+repetitions, timeouts, and independent evaluator configuration. The bundled
+runner constructs `EnochAdapter` directly; another
 `AgentAdapter` can be supplied through the experiment API.
 
 ```bash

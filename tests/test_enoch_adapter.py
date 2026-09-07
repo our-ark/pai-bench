@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import replace
 import json
+import os
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
+from types import ModuleType, SimpleNamespace
 import unittest
+from unittest.mock import Mock, patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +46,107 @@ PROFILE = (
 
 
 class EnochAdapterTests(unittest.TestCase):
+    def test_completion_dispatches_through_selected_runtime(self) -> None:
+        for provider, model in (("codex", "gpt-5.6-sol"), ("claude", "claude-opus-5")):
+            with self.subTest(provider=provider), TemporaryDirectory() as directory:
+                config = replace(
+                    _config(Path(directory)),
+                    runtime_provider=provider,
+                    model=model,
+                    reasoning_effort="high",
+                    timeout_seconds=17.5,
+                )
+                adapter = EnochAdapter(config)
+                _set_identity(adapter)
+                prefix = f"ENOCH_{provider.upper()}"
+                ambient = {
+                    "ENOCH_RUNTIME_PROVIDER": "another-live-runtime",
+                    f"{prefix}_MODEL": "another-live-model",
+                    f"{prefix}_REASONING_EFFORT": "low",
+                    "ENOCH_STATE_HOME": "another-live-state",
+                    "ENOCH_STATE_REDIRECT_ROOT": "another-live-root",
+                }
+                with patch.dict(os.environ, ambient):
+                    environment_before = dict(os.environ)
+                    with _fake_enoch(config) as backend:
+                        def respond(identity, prompt, *, cwd, execution):
+                            self.assertIs(identity, backend.identity)
+                            self.assertEqual(cwd, config.agent_root)
+                            self.assertEqual(execution.timeout_seconds, 17.5)
+                            self.assertEqual(execution.session_key, "")
+                            self.assertEqual(os.environ["ENOCH_RUNTIME_PROVIDER"], provider)
+                            self.assertEqual(os.environ[f"{prefix}_MODEL"], model)
+                            self.assertEqual(os.environ[f"{prefix}_REASONING_EFFORT"], "high")
+                            self.assertEqual(os.environ["ENOCH_STATE_HOME"], str(config.state_home))
+                            self.assertEqual(os.environ["ENOCH_STATE_REDIRECT_ROOT"], str(config.agent_root))
+                            self.assertIn("FABLE-JUNCTION-02", prompt)
+                            self.assertIn("Human message:", prompt)
+                            self.assertIn("Return the stable designation.", prompt)
+                            self.assertNotIn("expectations", prompt)
+                            self.assertNotIn("pai-model-judge", prompt)
+                            return _runtime_result()
+
+                        backend.runtime.respond.side_effect = respond
+                        answer = adapter.respond(_request())
+                        backend.load_provider.assert_called_once_with(
+                            "runtime", config.agent_root, name=provider
+                        )
+                        backend.runtime.reset_usage.assert_called_once_with()
+                        backend.direct_codex.assert_not_called()
+                        self.assertEqual(backend.activation_provider, provider)
+                    self.assertEqual(dict(os.environ), environment_before)
+
+                self.assertEqual(answer.metadata["runtime_provider"], provider)
+                self.assertEqual(answer.metadata["model"], model)
+                self.assertEqual(answer.metadata["reasoning_effort"], "high")
+                self.assertEqual(answer.metadata["session_id"], "fresh-test-session")
+                self.assertEqual(answer.metadata["completion_reason"], "completed")
+                self.assertEqual(answer.metadata["input_tokens"], 10)
+                self.assertEqual(answer.metadata["cached_input_tokens"], 2)
+                self.assertEqual(answer.metadata["output_tokens"], 3)
+                self.assertEqual(answer.metadata["reasoning_output_tokens"], 4)
+
+    def test_default_codex_is_pinned_even_when_environment_selects_claude(self) -> None:
+        with TemporaryDirectory() as directory:
+            config = _config(Path(directory))
+            adapter = EnochAdapter(config)
+            _set_identity(adapter)
+            with patch.dict(os.environ, {"ENOCH_RUNTIME_PROVIDER": "claude"}), _fake_enoch(config) as backend:
+                answer = adapter.respond(_request())
+                backend.load_provider.assert_called_once_with(
+                    "runtime", config.agent_root, name="codex"
+                )
+                self.assertEqual(os.environ["ENOCH_RUNTIME_PROVIDER"], "claude")
+            self.assertEqual(answer.metadata["runtime_provider"], "codex")
+
+    def test_runtime_failures_restore_environment_without_codex_fallback(self) -> None:
+        for failure in ("dependencies", "load", "respond", "mismatch"):
+            with self.subTest(failure=failure), TemporaryDirectory() as directory:
+                config = replace(_config(Path(directory)), runtime_provider="claude")
+                adapter = EnochAdapter(config)
+                _set_identity(adapter)
+                environment_before = dict(os.environ)
+                with _fake_enoch(config) as backend:
+                    if failure == "dependencies":
+                        backend.activate.side_effect = ImportError("missing dependency")
+                    elif failure == "load":
+                        backend.load_provider.side_effect = RuntimeError("provider unavailable")
+                    elif failure == "respond":
+                        backend.runtime.respond.side_effect = RuntimeError("provider timed out")
+                    else:
+                        backend.runtime.name = "codex"
+                    with self.assertRaises(EnochAdapterError):
+                        adapter.respond(_request())
+                    backend.direct_codex.assert_not_called()
+                    if failure != "respond":
+                        backend.runtime.respond.assert_not_called()
+                self.assertEqual(dict(os.environ), environment_before)
+
+    def test_unknown_runtime_is_rejected_before_inference(self) -> None:
+        with TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(EnochAdapterError, "runtime_provider"):
+                EnochAdapter(replace(_config(Path(directory)), runtime_provider="typo"))
+
     def test_direct_adapter_responds_without_command_transport(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -312,6 +417,70 @@ class EnochAdapterTests(unittest.TestCase):
                 "without self.json",
             ):
                 uninstalled.respond(_request())
+
+
+def _runtime_result():
+    return SimpleNamespace(
+        final_text="FABLE-JUNCTION-02",
+        session_id="fresh-test-session",
+        completion_reason="completed",
+        usage=SimpleNamespace(
+            input_tokens=10, cached_input_tokens=2, output_tokens=3, reasoning_tokens=4,
+        ),
+    )
+
+
+@contextmanager
+def _fake_enoch(config):
+    """Exercise the real completion function without an Enoch install or CLI call."""
+    source = config.agent_root / "src" / "enoch"
+    source.mkdir(parents=True)
+    (source / "brain.py").touch()
+    backend = SimpleNamespace(
+        identity=object(),
+        activation_provider=None,
+        direct_codex=Mock(side_effect=AssertionError("direct Codex path used")),
+        runtime=SimpleNamespace(
+            name=config.runtime_provider,
+            reset_usage=Mock(),
+            respond=Mock(return_value=_runtime_result()),
+        ),
+    )
+
+    def activate(root):
+        backend.activation_provider = os.environ["ENOCH_RUNTIME_PROVIDER"]
+
+    def memory(root, *, identity):
+        state = Path(os.environ["ENOCH_STATE_HOME"])
+        document = json.loads((state / "self.json").read_text(encoding="utf-8"))
+        return document["identity"]["names"]["canonical"]
+
+    backend.activate = Mock(side_effect=activate)
+    backend.load_provider = Mock(return_value=backend.runtime)
+    contents = {
+        "enoch": {},
+        "enoch.brain": {"respond_result": backend.direct_codex},
+        "enoch.runtime_dependencies": {"activate_runtime_dependencies": backend.activate},
+        "enoch.identity": {
+            "body_file_path": lambda root: root / "body.yaml",
+            "load_body_identity": lambda path: backend.identity,
+        },
+        "enoch.memory": {},
+        "enoch.memory.prompt": {"memory_for_prompt": memory},
+        "enoch.prompt_append": {"startup_context_note": lambda context: context},
+        "enoch.providers": {},
+        "enoch.providers.contracts": {
+            "RuntimeExecutionControl": lambda **kwargs: SimpleNamespace(session_key="", **kwargs),
+        },
+        "enoch.providers.registry": {"load_provider": backend.load_provider},
+    }
+    modules = {}
+    for name, members in contents.items():
+        module = ModuleType(name)
+        module.__dict__.update(members)
+        modules[name] = module
+    with patch.dict(sys.modules, modules):
+        yield backend
 
 
 def _config(root: Path) -> AgentAdapterConfig:

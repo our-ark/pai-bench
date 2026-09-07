@@ -13,8 +13,45 @@ PAI-Bench keeps three roles separate:
 `EnochAdapter` directly implements `AgentAdapter`. It does not add benchmark
 code to Enoch and does not make Enoch a package dependency of the benchmark
 core. At run time it imports the public runtime from the Enoch checkout given
-by `body_root` and calls Enoch's normal Codex completion path with the selected
-target model and reasoning effort.
+by `body_root` and dispatches through `load_provider("runtime", ...)` and the
+provider's read-only `respond` contract. Select the target with the top-level
+manifest field `runtime_provider` or the single-run `--runtime-provider` flag
+(`codex` or `claude`). This is independent of `evaluator.provider` and
+`--evaluator-provider`. Omission pins Codex for frozen-v1 compatibility; changing
+the live instance's provider alone does not change the benchmark target.
+
+The adapter sets the selected provider's model and reasoning-effort overrides
+only during the call, passes the timeout through `RuntimeExecutionControl`,
+and resets that provider's usage. It requests a fresh session, does not resume
+live chat sessions, and restores its environment overrides even after errors.
+Response metadata records the loaded `runtime_provider`, session ID, completion
+reason and token usage, plus the **requested** model and effort. Requested
+configuration is not proof of the model version actually served. A missing or
+failing Claude provider is an error, never a silent fallback to Codex.
+
+This path requires an Enoch checkout exposing the runtime-provider and execution
+control contracts, with the selected provider and its CLI installed and
+authenticated. The old direct-Codex path is not used. For target executable
+overrides use `ENOCH_CODEX_BIN` or `ENOCH_CLAUDE_BIN` as supported by Enoch, not
+the `PAI_BENCH_*_BIN` variables used by the independent judges.
+
+For a new Claude-target development campaign, add these fields to a working
+manifest (do not edit the frozen release files):
+
+```json
+{
+  "runtime_provider": "claude",
+  "models": ["claude-opus-5"],
+  "reasoning_efforts": ["high"]
+}
+```
+
+The equivalent single-run target options are `--runtime-provider claude
+--model claude-opus-5 --reasoning-effort high`. Specify the judge separately.
+Non-Codex target providers enter plan/run provenance and fingerprints, so resume
+and saved-response rescoring cannot mix different target runtimes. Omitted and
+explicit Codex retain the legacy fingerprints. Use a new output directory for
+a harness comparison rather than appending to a completed campaign.
 
 For `installed` mode, the runner calls `AgentAdapter.set_identity()` exactly
 once before inference. `EnochAdapter` maps that operation to the run's private
@@ -38,6 +75,26 @@ startup path treats versioned `body.yaml` and private `self.json` as distinct
 inputs: the former identifies the executable body, while the latter carries
 the portable personal identity. The benchmark adapter owns profile locking and
 governed transitions; Enoch owns startup consumption.
+
+State redirection isolates the native startup-loading path; it is not a
+filesystem sandbox. Harness file tools may still read accessible files in the
+body checkout. Use a dedicated checkout without production private data for
+benchmark runs. The adapter does not copy live credentials, identity, or memory
+into benchmark state.
+
+Offline checks (Python 3.11+):
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests
+PAI_TEST_ENOCH_ROOT=/absolute/path/to/enoch PYTHONPATH=src \
+  python3 -m unittest discover -s tests -p 'test_enoch_runtime_integration.py' -v
+```
+
+The opt-in integration tests load the real Enoch providers but replace both
+CLIs with a local fixture. They check command-line model/effort, read-only
+execution, fresh sessions, and native identity loading without model calls.
+They require the Enoch runtime dependencies to be available locally; they are
+not a live migration or behavioral evaluation.
 
 When a profile declares target-visible non-identity context, the runner also
 calls `AgentAdapter.set_startup_context()` once. `EnochAdapter` persists it as

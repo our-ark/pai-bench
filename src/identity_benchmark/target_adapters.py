@@ -64,6 +64,7 @@ class AgentAdapterConfig:
     reasoning_effort: str
     identity_mode: str
     timeout_seconds: float = 600.0
+    runtime_provider: str = "codex"
 
 
 AgentFactory = Callable[[AgentAdapterConfig], AgentAdapter]

@@ -105,7 +105,11 @@ evaluation rules after inspecting responses from either frozen split.
 The runner constructs `EnochAdapter` directly from `body_root` and each matrix
 condition, and constructs `CodexEvaluator` or `ClaudeEvaluator` from the
 provider named by the evaluator section of the experiment manifest. Omitting
-`provider` retains the frozen v1 Codex behavior. Custom harnesses can inject another
+`evaluator.provider` retains the frozen v1 Codex judge. The independent top-level
+`runtime_provider` selects the Enoch **target** harness (`codex` by default, or
+`claude`); for a single-profile run use `--runtime-provider claude` with an
+explicit `--model` and `--reasoning-effort`. Model/effort settings are applied to
+the selected runtime, not hardcoded to Codex. Custom harnesses can inject another
 `AgentAdapter` factory without changing benchmark questions or scoring.
 
 In decoupled experiments, the adapter receives only the identity contract.

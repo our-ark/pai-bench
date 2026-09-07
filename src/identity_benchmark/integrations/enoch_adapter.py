@@ -36,7 +36,8 @@ from identity_benchmark.target_adapters import (
 
 
 IDENTITY_MODES = {"full-context", "installed", "none", "uninstalled"}
-ADAPTER_ID = "enoch-adapter-v3"
+RUNTIME_PROVIDERS = ("codex", "claude")
+ADAPTER_ID = "enoch-adapter-v4"
 _SELF_FILENAME = "self.json"
 _STARTUP_CONTEXT_FILENAME = "startup-context.json"
 _PROFILE_LOCK_FILENAME = "profile.json"
@@ -190,31 +191,44 @@ def target_prompt(request: BenchmarkRequest, config: AgentAdapterConfig) -> str:
 
 
 def complete_with_enoch(prompt: str, config: AgentAdapterConfig) -> EnochCompletion:
+    _validate_request(config.profile.profile_id, config)
     _validate_enoch_root(config.agent_root)
     source_root = config.agent_root / "src"
     with _temporary_sys_path(source_root), _temporary_environment(
         {
             "ENOCH_STATE_HOME": str(config.state_home),
             "ENOCH_STATE_REDIRECT_ROOT": str(config.agent_root),
-            "ENOCH_CODEX_MODEL": config.model,
-            "ENOCH_CODEX_REASONING_EFFORT": config.reasoning_effort,
-            "ENOCH_CODEX_TIMEOUT": str(max(1, int(config.timeout_seconds))),
+            # Pin the target independently of both the live instance and judge.
+            "ENOCH_RUNTIME_PROVIDER": config.runtime_provider,
+            f"ENOCH_{config.runtime_provider.upper()}_MODEL": config.model,
+            f"ENOCH_{config.runtime_provider.upper()}_REASONING_EFFORT": (
+                config.reasoning_effort
+            ),
         }
     ):
         try:
             from enoch.runtime_dependencies import activate_runtime_dependencies
 
             activate_runtime_dependencies(config.agent_root)
-            from enoch.brain import reset_token_usage, respond_result
             from enoch.identity import body_file_path, load_body_identity
             from enoch.memory.prompt import memory_for_prompt
             from enoch.prompt_append import startup_context_note
+            from enoch.providers.contracts import RuntimeExecutionControl
+            from enoch.providers.registry import load_provider
         except ImportError as error:
             raise EnochAdapterError(
                 f"could not import Enoch from {source_root}: {error}"
             ) from error
         try:
-            reset_token_usage()
+            runtime = load_provider(
+                "runtime", config.agent_root, name=config.runtime_provider
+            )
+            if runtime.name != config.runtime_provider:
+                raise EnochAdapterError(
+                    f"requested runtime {config.runtime_provider!r}, "
+                    f"but loaded {runtime.name!r}"
+                )
+            runtime.reset_usage()
             body_identity = load_body_identity(body_file_path(config.agent_root))
             startup_context = memory_for_prompt(
                 config.agent_root,
@@ -232,10 +246,15 @@ def complete_with_enoch(prompt: str, config: AgentAdapterConfig) -> EnochComplet
                     prompt,
                 ]
             )
-            result = respond_result(
+            result = runtime.respond(
                 body_identity,
                 runtime_prompt,
                 cwd=config.agent_root,
+                # An empty session key requests a fresh, read-only response;
+                # the provider enforces the deadline for either harness.
+                execution=RuntimeExecutionControl(
+                    timeout_seconds=config.timeout_seconds,
+                ),
             )
         except Exception as error:  # Enoch owns its runtime exception hierarchy.
             raise EnochAdapterError(f"Enoch completion failed: {error}") from error
@@ -243,6 +262,9 @@ def complete_with_enoch(prompt: str, config: AgentAdapterConfig) -> EnochComplet
     return EnochCompletion(
         response=result.final_text,
         metadata={
+            "runtime_provider": runtime.name,
+            "session_id": result.session_id,
+            "completion_reason": result.completion_reason,
             "input_tokens": usage.input_tokens,
             "cached_input_tokens": usage.cached_input_tokens,
             "output_tokens": usage.output_tokens,
@@ -425,6 +447,10 @@ def _conversation(request: BenchmarkRequest) -> str:
 
 
 def _validate_request(profile_id: str, config: AgentAdapterConfig) -> None:
+    if config.runtime_provider not in RUNTIME_PROVIDERS:
+        raise EnochAdapterError(
+            "runtime_provider must be one of: " + ", ".join(RUNTIME_PROVIDERS)
+        )
     if config.identity_mode not in IDENTITY_MODES:
         raise EnochAdapterError(
             "identity mode must be one of: " + ", ".join(sorted(IDENTITY_MODES))

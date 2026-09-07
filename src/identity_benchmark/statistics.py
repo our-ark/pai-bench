@@ -725,6 +725,10 @@ def _validate_same_response_comparison(
         )
     for key, primary in primary_lookup.items():
         comparison = comparison_lookup[key]
+        if primary.runtime_provider != comparison.runtime_provider:
+            raise StatisticalAnalysisError(
+                f"Cross-judge analysis requires the same target runtime for {key}."
+            )
         primary_results = {
             result.probe_id: result for result in primary.report.results
         }

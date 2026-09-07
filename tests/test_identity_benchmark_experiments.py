@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import Future
+from dataclasses import replace
 import json
 from pathlib import Path
 import sys
@@ -19,6 +20,7 @@ from identity_benchmark.experiments import (
     format_experiment_report,
     load_experiment_spec,
     plan_experiment,
+    parse_experiment_spec,
     rescore_experiment,
 )
 from evaluator_support import (
@@ -107,6 +109,91 @@ class _ImmediateProcessPool:
 
 
 class IdentityBenchmarkExperimentTests(unittest.TestCase):
+    def test_target_runtime_defaults_to_codex_and_changes_fingerprints(self) -> None:
+        with TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            manifest = self._manifest(temporary)
+            original = load_experiment_spec(manifest)
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            payload["runtime_provider"] = "claude"
+            claude = parse_experiment_spec(payload, base=temporary)
+            codex_plan = plan_experiment(original)
+            explicit_codex = plan_experiment(replace(original, runtime_provider="codex"))
+            claude_plan = plan_experiment(claude)
+
+        self.assertEqual(original.runtime_provider, "codex")
+        self.assertEqual(claude.runtime_provider, "claude")
+        self.assertEqual(codex_plan.to_dict(), explicit_codex.to_dict())
+        self.assertNotIn("runtime_provider", codex_plan.runs[0].to_dict())
+        self.assertEqual(claude_plan.runs[0].to_dict()["runtime_provider"], "claude")
+        self.assertNotEqual(codex_plan.runs[0].fingerprint, claude_plan.runs[0].fingerprint)
+        self.assertNotEqual(codex_plan.campaign_fingerprint, claude_plan.campaign_fingerprint)
+
+    def test_manifest_rejects_unknown_target_runtime(self) -> None:
+        with TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            payload = json.loads(self._manifest(temporary).read_text(encoding="utf-8"))
+            payload["runtime_provider"] = "typo"
+            with self.assertRaisesRegex(ExperimentError, "runtime_provider"):
+                parse_experiment_spec(payload, base=temporary)
+
+    def test_claude_runtime_reaches_target_factory_and_survives_resume(self) -> None:
+        from evaluator_support import synthetic_agent_factory
+
+        with TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            spec = replace(
+                load_experiment_spec(self._manifest(temporary)), runtime_provider="claude"
+            )
+            configs = []
+
+            def factory(config):
+                configs.append(config)
+                return synthetic_agent_factory(config)
+
+            # Call the production matrix runner with an offline target/judge.
+            from identity_benchmark.experiments import run_experiment as run_matrix
+
+            report = run_matrix(
+                spec, temporary / "reports", agent_factory=factory,
+                evaluator_factory=expectation_evaluator_factory,
+            )
+            resumed = run_matrix(
+                spec, temporary / "reports", agent_factory=factory,
+                evaluator_factory=expectation_evaluator_factory, resume=True,
+            )
+            saved = json.loads(
+                (temporary / "reports" / "runs" / "run-0001.json").read_text(encoding="utf-8")
+            )
+            rescored = rescore_experiment(
+                spec, temporary / "reports", replace(spec, experiment_id="new-judge"),
+                temporary / "comparison", evaluator_factory=expectation_evaluator_factory,
+            )
+
+        self.assertEqual(len(configs), 2)  # Resume did not regenerate responses.
+        self.assertTrue(all(config.runtime_provider == "claude" for config in configs))
+        self.assertTrue(all(run.runtime_provider == "claude" for run in report.runs))
+        self.assertEqual(saved["runtime_provider"], "claude")
+        self.assertTrue(resumed.is_complete)
+        self.assertTrue(all(run.runtime_provider == "claude" for run in resumed.runs))
+        self.assertTrue(all(run.runtime_provider == "claude" for run in rescored.runs))
+
+    def test_resume_and_rescore_reject_target_runtime_change(self) -> None:
+        with TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            source = load_experiment_spec(self._manifest(temporary))
+            output = temporary / "source"
+            run_experiment(source, output)
+            changed = replace(source, runtime_provider="claude")
+            with self.assertRaisesRegex(ExperimentError, "changed"):
+                run_experiment(changed, output, resume=True)
+            with self.assertRaisesRegex(ExperimentError, "identical target runs"):
+                rescore_experiment(
+                    source, output, replace(changed, experiment_id="new-judge"),
+                    temporary / "comparison",
+                    evaluator_factory=expectation_evaluator_factory,
+                )
+
     def _manifest(self, directory: Path, *, repetitions: int = 1) -> Path:
         manifest = directory / "experiment.json"
         manifest.write_text(

@@ -588,6 +588,26 @@ class IdentityBenchmarkTests(unittest.TestCase):
         self.assertIn("metric_scores", report)
         self.assertEqual(report["errors"], 0)
 
+    def test_run_cli_selects_claude_target_independently_of_codex_judge(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output), patch(
+            "identity_benchmark.cli.CodexEvaluator", return_value=TEST_EVALUATOR,
+        ) as judge, patch(
+            "identity_benchmark.cli.EnochAdapter", side_effect=SyntheticAgent,
+        ) as target:
+            main([
+                "run", str(PROFILE), "--instance-id", "claude-test",
+                "--enoch-root", str(ROOT), "--runtime-provider", "claude",
+                "--model", "claude-opus-5", "--reasoning-effort", "high",
+                "--identity-mode", "full-context", "--evaluator-model", "judge-model",
+            ])
+        config = target.call_args.args[0]
+        self.assertEqual(config.runtime_provider, "claude")
+        self.assertEqual(config.model, "claude-opus-5")
+        self.assertEqual(config.reasoning_effort, "high")
+        self.assertEqual(judge.call_args.kwargs["model"], "judge-model")
+        self.assertIn("Errors: 0", output.getvalue())
+
     def test_rescore_matrix_cli_forwards_max_new_runs(self) -> None:
         output = StringIO()
         with redirect_stdout(output), patch(

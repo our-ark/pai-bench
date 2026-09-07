@@ -33,7 +33,7 @@ from identity_benchmark.rescore import rescore_saved_report
 from identity_benchmark.codex_evaluator import CodexEvaluator
 from identity_benchmark.claude_evaluator import ClaudeEvaluator
 from identity_benchmark.evaluators import Evaluator
-from identity_benchmark.integrations.enoch_adapter import EnochAdapter
+from identity_benchmark.integrations.enoch_adapter import EnochAdapter, RUNTIME_PROVIDERS
 from identity_benchmark.probe_suites import (
     IdentityProfile,
     ProbeSuiteError,
@@ -83,6 +83,7 @@ class ExperimentSpec:
     population_path: Path | None = None
     probe_suite_path: Path | None = None
     probe_binding_paths: tuple[tuple[str, Path], ...] = ()
+    runtime_provider: str = "codex"
 
     @property
     def profile_path(self) -> Path:
@@ -101,9 +102,10 @@ class ExperimentRun:
     report: BenchmarkReport
     experiment_id: str = ""
     fingerprint: str = ""
+    runtime_provider: str = "codex"
 
     def to_dict(self) -> dict[str, JsonValue]:
-        return {
+        value: dict[str, JsonValue] = {
             "schema_version": EXPERIMENT_SCHEMA_VERSION,
             "experiment_id": self.experiment_id,
             "run_id": self.run_id,
@@ -115,6 +117,9 @@ class ExperimentRun:
             "repetition": self.repetition,
             "report": self.report.to_dict(),
         }
+        if self.runtime_provider != "codex":
+            value["runtime_provider"] = self.runtime_provider
+        return value
 
 
 @dataclass(frozen=True)
@@ -127,9 +132,10 @@ class PlannedRun:
     identity_mode: str
     repetition: int
     fingerprint: str
+    runtime_provider: str = "codex"
 
     def to_dict(self) -> dict[str, JsonValue]:
-        return {
+        value: dict[str, JsonValue] = {
             "run_id": self.run_id,
             "profile_id": self.profile.profile_id,
             "model": self.model,
@@ -138,6 +144,9 @@ class PlannedRun:
             "repetition": self.repetition,
             "fingerprint": self.fingerprint,
         }
+        if self.runtime_provider != "codex":
+            value["runtime_provider"] = self.runtime_provider
+        return value
 
 
 @dataclass(frozen=True)
@@ -276,6 +285,7 @@ def parse_experiment_spec(value: object, *, base: Path) -> ExperimentSpec:
             "probe_suite",
             "probe_bindings",
             "instance_command",
+            "runtime_provider",
         },
     )
     if root["schema_version"] != EXPERIMENT_SCHEMA_VERSION:
@@ -336,7 +346,17 @@ def parse_experiment_spec(value: object, *, base: Path) -> ExperimentSpec:
         timeout_seconds=timeout_seconds,
         probe_suite_path=probe_suite_path,
         probe_binding_paths=probe_binding_paths,
+        runtime_provider=_runtime_provider(root.get("runtime_provider", "codex")),
     )
+
+
+def _runtime_provider(value: object) -> str:
+    selected = _text(value, "runtime_provider")
+    if selected not in RUNTIME_PROVIDERS:
+        raise ExperimentError(
+            "runtime_provider must be one of: " + ", ".join(RUNTIME_PROVIDERS)
+        )
+    return selected
 
 
 def plan_experiment(
@@ -345,6 +365,7 @@ def plan_experiment(
     batch_size: int | None = None,
     batch_index: int = 1,
 ) -> ExperimentPlan:
+    _runtime_provider(spec.runtime_provider)
     loaded = _load_profiles(spec)
     profiles = tuple(profile for _, profile in loaded)
     _validate_profiles(profiles, spec.counterfactual_pairs)
@@ -366,6 +387,7 @@ def plan_experiment(
                                 reasoning_effort=reasoning_effort,
                                 identity_mode=identity_mode,
                                 repetition=repetition,
+                                runtime_provider=spec.runtime_provider,
                                 fingerprint=_run_fingerprint(
                                     spec,
                                     profile,
@@ -794,6 +816,7 @@ def _rescore_planned_condition(
         report=report,
         experiment_id=spec.experiment_id,
         fingerprint=planned.fingerprint,
+        runtime_provider=planned.runtime_provider,
     )
 
 
@@ -808,6 +831,7 @@ def _validate_rescore_plans(
                 run.profile.profile_id,
                 run.profile.to_dict(),
                 run.model,
+                run.runtime_provider,
                 run.reasoning_effort,
                 run.identity_mode,
                 run.repetition,
@@ -879,7 +903,7 @@ def format_experiment_plan(plan: ExperimentPlan) -> str:
         lines.append(
             f"- {run.run_id}: {run.profile.profile_id} / {run.model} / "
             f"{run.reasoning_effort} / {run.identity_mode} / "
-            f"repetition {run.repetition}"
+            f"repetition {run.repetition} / runtime {run.runtime_provider}"
         )
     return "\n".join(lines)
 
@@ -954,6 +978,7 @@ def _load_existing_runs(
             ("fingerprint", run.fingerprint, planned.fingerprint),
             ("profile_id", run.profile_id, planned.profile.profile_id),
             ("model", run.model, planned.model),
+            ("runtime_provider", run.runtime_provider, planned.runtime_provider),
             ("reasoning_effort", run.reasoning_effort, planned.reasoning_effort),
             ("identity_mode", run.identity_mode, planned.identity_mode),
             ("repetition", run.repetition, planned.repetition),
@@ -995,6 +1020,7 @@ def _parse_experiment_run(value: object, *, label: str) -> ExperimentRun:
             "repetition",
             "report",
         },
+        optional={"runtime_provider"},
     )
     if root["schema_version"] != EXPERIMENT_SCHEMA_VERSION:
         raise ExperimentError(
@@ -1016,6 +1042,7 @@ def _parse_experiment_run(value: object, *, label: str) -> ExperimentRun:
         identity_mode=_text(root["identity_mode"], f"{label}.identity_mode"),
         repetition=_positive_int(root["repetition"], f"{label}.repetition"),
         report=report,
+        runtime_provider=_runtime_provider(root.get("runtime_provider", "codex")),
     )
 
 
@@ -1061,19 +1088,21 @@ def _run_fingerprint(
             evaluator["provider"] = spec.evaluator.provider
         if spec.evaluator.max_budget_usd is not None:
             evaluator["max_budget_usd"] = spec.evaluator.max_budget_usd
-    return _fingerprint(
-        {
-            "experiment_id": spec.experiment_id,
-            "profile": profile.to_dict(),
-            "body_root": str(spec.body_root),
-            "model": model,
-            "reasoning_effort": reasoning_effort,
-            "identity_mode": identity_mode,
-            "repetition": repetition,
-            "timeout_seconds": spec.timeout_seconds,
-            "evaluator": evaluator,
-        }
-    )
+    value: dict[str, JsonValue] = {
+        "experiment_id": spec.experiment_id,
+        "profile": profile.to_dict(),
+        "body_root": str(spec.body_root),
+        "model": model,
+        "reasoning_effort": reasoning_effort,
+        "identity_mode": identity_mode,
+        "repetition": repetition,
+        "timeout_seconds": spec.timeout_seconds,
+        "evaluator": evaluator,
+    }
+    # Keep implicit/explicit Codex compatible with frozen v1 fingerprints.
+    if spec.runtime_provider != "codex":
+        value["runtime_provider"] = spec.runtime_provider
+    return _fingerprint(value)
 
 
 def _fingerprint(value: dict[str, JsonValue]) -> str:
@@ -1245,6 +1274,7 @@ def _run_condition(
             reasoning_effort=reasoning_effort,
             identity_mode=identity_mode,
             timeout_seconds=spec.timeout_seconds,
+            runtime_provider=spec.runtime_provider,
         )
     )
     if identity_mode == "installed":
@@ -1268,6 +1298,7 @@ def _run_condition(
         report=run_benchmark(profile, instance, evaluator=evaluator),
         experiment_id=spec.experiment_id,
         fingerprint=fingerprint,
+        runtime_provider=spec.runtime_provider,
     )
 
 

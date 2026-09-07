@@ -22,6 +22,7 @@ from identity_benchmark.evaluators import Evaluator, EvaluatorError
 from identity_benchmark.integrations.enoch_adapter import (
     EnochAdapter,
     IDENTITY_MODES,
+    RUNTIME_PROVIDERS,
 )
 from identity_benchmark.experiments import (
     ExperimentError,
@@ -163,6 +164,7 @@ def main(argv: list[str] | None = None) -> None:
                     reasoning_effort=args.reasoning_effort,
                     identity_mode=args.identity_mode,
                     timeout_seconds=args.timeout,
+                    runtime_provider=args.runtime_provider,
                 )
             )
             if args.identity_mode == "installed":
@@ -346,6 +348,12 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("profile", type=Path)
     run.add_argument("--instance-id", required=True)
     run.add_argument("--enoch-root", type=Path, required=True)
+    run.add_argument(
+        "--runtime-provider",
+        choices=RUNTIME_PROVIDERS,
+        default="codex",
+        help="Enoch target harness, independent of --evaluator-provider (default: codex)",
+    )
     run.add_argument("--model", required=True)
     run.add_argument("--reasoning-effort", default="medium")
     run.add_argument(

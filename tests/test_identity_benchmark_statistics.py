@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 import shutil
 import sys
@@ -27,6 +28,21 @@ VECTOR_SOUTH = VECTOR_NORTH.with_name("vector-south.json")
 
 
 class IdentityBenchmarkStatisticsTests(unittest.TestCase):
+    def test_cross_judge_analysis_rejects_changed_target_runtime(self) -> None:
+        with TemporaryDirectory() as directory:
+            temporary = Path(directory)
+            spec, output = self._experiment(temporary)
+            comparison = replace(
+                spec, experiment_id="claude-target", runtime_provider="claude"
+            )
+            compared_output = temporary / "claude-runs"
+            run_experiment(comparison, compared_output)
+            with self.assertRaisesRegex(StatisticalAnalysisError, "same target runtime"):
+                analyze_experiment(
+                    spec, output, comparison_spec=comparison,
+                    comparison_report_dir=compared_output, samples=100,
+                )
+
     def _experiment(self, directory: Path):
         manifest = directory / "experiment.json"
         manifest.write_text(
