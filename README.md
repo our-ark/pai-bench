@@ -13,6 +13,21 @@ target contract is agent-framework and model-provider neutral. Evaluation is
 defined by a small `Evaluator` interface; the bundled implementations are
 `CodexEvaluator` and `ClaudeEvaluator`.
 
+## Paper and reproducibility
+
+For the paper's frozen evidence, download the **paper-evidence ZIP** from the
+[v1.0.0 release](https://github.com/our-ark/pai-bench/releases/tag/v1.0.0).
+It includes sanitized responses, recorded judge outputs, analysis scripts,
+and historical source snapshots, with checksums and an offline verifier.
+The current tagged code supports fresh runs; it is not a claim that this
+release commit generated every historical result. See
+[reproducing the paper](docs/reproducing-paper.md) for the evidence map and
+limitations. Manuscript files are distributed separately, not in this repo.
+
+In this repository, "evaluator-private" means hidden from the **target agent**,
+not secret from researchers: scoring bindings are intentionally published for
+inspection and reproducibility. Do not feed them into the target context.
+
 ## Install
 
 ```bash
